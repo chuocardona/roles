@@ -26,8 +26,8 @@
 #        transaction_id: "{{ tower_job_id }}"
 
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
-  #hosts: win_host1 # Asegúrate que este host existe en tu inventario
-  hosts: localhost
+  hosts: win_host1 # Asegúrate que este host existe en tu inventario
+  #hosts: localhost
   gather_facts: true
   # become: true
   # become_method: ansible.builtin.runas
