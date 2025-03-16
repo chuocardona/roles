@@ -59,7 +59,8 @@
       vars:
         fase: "create"
         checklist_code: "{{ csv_item[0] }}"
-        client_code: "{{ hostvars['win_host1'].client_code }}"
+        #client_code: "{{ hostvars['win_host1'].client_code }}"
+        client_code: "AIG"
         task_name: "{{ csv_item[1] }}"
         task_code: "{{ csv_item[2] }}"
         task_description: "{{ csv_item[3] }}" 
