@@ -38,7 +38,8 @@
             [
               checklist_code | string,
               "Control ficheros",
-              1 | string,
+              #1 | string,
+              "1",              
               "Control existencia ficheros LOCAL",
               tk_result_description | default('Fallo desconocido'),
               tk_result | default('Failed'),
@@ -77,7 +78,8 @@
             [
               checklist_code,
               "Control ficheros",
-              2,
+              #2,
+              "2",
               "Control existencia ficheros AZURE",
               tk_result_description | default('Fallo en Azure'),
               tk_result | default('Failed'),
