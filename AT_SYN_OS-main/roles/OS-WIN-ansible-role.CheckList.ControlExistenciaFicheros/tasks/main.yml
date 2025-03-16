@@ -42,7 +42,6 @@
               "Control existencia ficheros LOCAL",
               tk_result_description | default('Fallo desconocido'),
               tk_result | default('Failed'),
-              inventory_hostname
             ]
           ] }}
 
