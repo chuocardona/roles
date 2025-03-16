@@ -58,7 +58,9 @@
         name: OS-LINUX-ansible-role.CSV.Dashboard
       vars:
         fase: "create"
-        checklist_code: "{{ item[0] }}"
+        #checklist_code: "{{ item[0] }}"
+        checklist_code: "{{ csv_item[0] }}"
+        client_code: "{{ hostvars['win_host1'].client_code }}"
         task_name: "{{ item[1] }}"
         #task_code: "{{ item[2] }}"
         task_code: "{{ csv_item[2] }}"  # <-- Referencia correcta
