@@ -1,0 +1,60 @@
+---
+- name: Folder creation when not custom folder
+  when:
+    - create_folder_in_sp
+    - not(create_custom_folder)
+  block:
+    - name: Set folder name
+      ansible.builtin.set_fact:
+        sp_dir_create: "{{ sp_dir_prefix | default('upload_job') + '_' + tower_job_id | string }}"
+
+    - name: Create folder in SharePoint if not exists
+      ansible.builtin.uri:
+        url: "{{ sharepoint_site_url }}/_api/web/GetFolderByServerRelativeUrl('{{ sharepoint_root_folder }}')/folders"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ access_token }}"
+          Accept: "application/json;odata=verbose"
+          Content-Type: "application/json"
+          X-RequestDigest: "{{ digest_code }}"
+        body_format: json
+        body: |
+          {
+            "ServerRelativeUrl": "{{ sp_dir_create }}"
+          }
+      register: result_folder
+      failed_when: result_folder.status not in [200, 201]
+      no_log: true
+
+- name: Folder creation when custom folder
+  when:
+    - create_custom_folder
+  block:
+    - name: Check mandatory variables
+      ansible.builtin.debug:
+        msg:
+          - "[{{ 'custom_folder_name OK' if (not (custom_folder_name == '')) else 'custom_folder_name ERROR' }}]"
+      failed_when:
+        - (custom_folder_name == '')
+
+    - name: Set sp_dir_create
+      ansible.builtin.set_fact:
+        sp_dir_create: "{{ custom_folder_name }}"
+
+    - name: Create folder in SharePoint if not exists
+      ansible.builtin.uri:
+        url: "{{ sharepoint_site_url }}/_api/web/GetFolderByServerRelativeUrl('{{ sharepoint_root_folder }}')/folders"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ access_token }}"
+          Accept: "application/json;odata=verbose"
+          Content-Type: "application/json"
+          X-RequestDigest: "{{ digest_code }}"
+        body_format: json
+        body: |
+          {
+            "ServerRelativeUrl": "{{ sp_dir_create }}"
+          }
+      register: result_folder
+      failed_when: result_folder.status not in [200, 201]
+      no_log: false

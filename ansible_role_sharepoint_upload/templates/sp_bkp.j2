@@ -1,0 +1,36 @@
+{
+    "@type": "MessageCard",
+    "@context": "http://schema.org/extensions",
+    "themeColor": "464EB8",
+    "summary": "{{ teams_summary }}",
+	  "title": "{{ teams_title }}",
+    "sections": [{
+        "activityTitle": "Sharepoint Upload Status",
+        "facts": [{
+            "name": "Status",
+            "value": "{{ sharepoint_upload_status_msg }}"
+        },{
+            "name": "Sharepoint URL",
+            "value": "{{ sharepoint_download_url }}"
+        }],
+        "potentialAction": [
+            {
+                "@context": "http://schema.org",
+                "@type": "ViewAction",
+                "name": "View in Ansible Tower",
+                "target": [
+                    "{{ tower_host }}/{{ tower_job_suffix }}"
+                ]
+            },
+            {
+                "@context": "http://schema.org",
+                "@type": "ViewAction",
+                "name": "View in SharePoint",
+                "target": [
+                    "{{ sharepoint_download_url }}"
+                ]
+            }
+        ],
+        "markdown": true
+    }]
+}

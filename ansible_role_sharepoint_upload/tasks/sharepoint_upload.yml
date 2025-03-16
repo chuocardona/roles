@@ -1,0 +1,66 @@
+---
+- name: Upload file to Sharepoint - folder
+  ansible.builtin.uri:
+    url:
+      "{{ sharepoint_site_url }}/_api/web/\
+      GetFolderByServerRelativeUrl('{{ sharepoint_root_folder }}/{{ sp_dir_create }}')/\
+      Files/add(url='{{ item.path | basename }}',overwrite=true)"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ access_token }}"
+      Content-Type: application/octet-stream
+      X-RequestDigest: "{{ digest_code }}"
+    src: "{{ item.path }}"
+  when:
+    - create_folder_in_sp
+    - not upload_to_custom_folder
+    - not upload_to_subfolder
+
+- name: Upload file to Sharepoint - custom folder
+  when:
+    - create_custom_folder or upload_to_custom_folder
+    - not upload_to_subfolder
+  block:
+    - name: Check mandatory variables
+      ansible.builtin.debug:
+        msg:
+          - "[{{ 'custom_folder_name OK' if (not (custom_folder_name == '')) else 'custom_folder_name ERROR' }}]"
+      failed_when: custom_folder_name == ''
+
+    - name: Upload file
+      ansible.builtin.uri:
+        url:
+          "{{ sharepoint_site_url }}/_api/web/\
+          GetFolderByServerRelativeUrl('{{ sharepoint_root_folder }}/{{ custom_folder_name }}')/\
+          Files/add(url='{{ item.path | basename }}',overwrite=true)"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ access_token }}"
+          Content-Type: application/octet-stream
+          X-RequestDigest: "{{ digest_code }}"
+        src: "{{ item.path }}"
+
+- name: Upload file to Sharepoint - subfolder
+  when:
+    - create_subfolder_in_sp or upload_to_subfolder
+    - not upload_to_custom_folder
+  block:
+    - name: Check mandatory variables
+      ansible.builtin.debug:
+        msg:
+          - "[{{ 'subfolder_name OK' if (not (subfolder_name == '')) else 'subfolder_name ERROR' }}]"
+      failed_when:
+        - (subfolder_name == '')
+
+    - name: Upload file
+      ansible.builtin.uri:
+        url:
+          "{{ sharepoint_site_url }}/_api/web/\
+          GetFolderByServerRelativeUrl('{{ sharepoint_root_folder }}/{{ sp_dir_create }}/{{ subfolder_name | trim }}')/\
+          Files/add(url='{{ item.path | basename }}',overwrite=true)"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ access_token }}"
+          Content-Type: application/octet-stream
+          X-RequestDigest: "{{ digest_code }}"
+        src: "{{ item.path }}"

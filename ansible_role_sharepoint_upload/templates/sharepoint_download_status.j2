@@ -1,0 +1,31 @@
+{
+    "@type": "MessageCard",
+    "@context": "http://schema.org/extensions",
+    "themeColor": "464EB8",
+    "summary": "{{ teams_summary }}",
+	  "title": "{{ teams_title }}",
+    "sections": [{
+        "activityTitle": "Sharepoint Download Status",
+        "facts": [{
+            "name": "Status",
+            "value": "{{ sharepoint_download_status_msg }}"
+        },{
+            "name": "Successfully Downloaded Files",
+            "value": "{{ sharepoint_downloaded_files }}"
+        },{
+            "name": "Download Failed Files",
+            "value": "{{ sharepoint_download_failed_files }}"
+        }],
+        "potentialAction": [
+            {
+                "@context": "http://schema.org",
+                "@type": "ViewAction",
+                "name": "View in Ansible Tower",
+                "target": [
+                    "{{ tower_host }}/{{ tower_job_suffix }}"
+                ]
+            }
+        ],
+        "markdown": true
+    }]
+}
