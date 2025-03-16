@@ -44,12 +44,13 @@
     job_id: "{{ ansible_date_time.epoch }}"  # <-- Variable requerida
     current_timestamp: "{{ ansible_date_time.iso8601 }}"
   tasks:
-    - name: Debug arr_results # <-- Añadir aquí
+    - name: Debug arr_results
       ansible.builtin.debug:
         var: hostvars[item].arr_results
-      loop: "{{ groups['windows'] }}"
+      loop: "{{ groups['windows'] | default([]) }}"
       loop_control:
-        label: "{{ item }}"  # Muestra el hostname en vez de todo el item
+        label: "{{ item }}"
+      when: groups.windows is defined
 
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
       include_role:
