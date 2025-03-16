@@ -54,21 +54,21 @@
       when: groups.windows is defined
 
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
-     include_role:
-       name: OS-LINUX-ansible-role.CSV.Dashboard
-     vars:
-       fase: "create"
-       checklist_code: "{{ csv_item[0] | default('CHK-0044') }}"  # <-- Valor por defecto
-       client_code: "AIG"
-       task_name: "{{ csv_item[1] | default('Tarea no definida') }}"
-       task_code: "{{ csv_item[2] | default('CODE-0000') }}"
-       task_description: "{{ csv_item[3] | default('Descripción no disponible') }}" 
-       task_result_description: "{{ csv_item[4] | default('N/A') }}"
-       task_result: "{{ csv_item[4] | default('N/A') }}"
-     loop: "{{ hostvars | dict2items | selectattr('value.arr_results', 'defined') | map(attribute='value.arr_results') | sum(start=[]) }}"
-     loop_control:
-       loop_var: csv_item
-     when: csv_item | length >= 5  # <-- Filtra elementos incompletos
+      include_role:
+        name: OS-LINUX-ansible-role.CSV.Dashboard
+      vars:
+        fase: "create"
+        checklist_code: "{{ csv_item[0] | default('CHK-0044') }}"  # <-- Valor por defecto
+        client_code: "AIG"
+        task_name: "{{ csv_item[1] | default('Tarea no definida') }}"
+        task_code: "{{ csv_item[2] | default('CODE-0000') }}"
+        task_description: "{{ csv_item[3] | default('Descripción no disponible') }}" 
+        task_result_description: "{{ csv_item[4] | default('N/A') }}"
+        task_result: "{{ csv_item[4] | default('N/A') }}"
+      loop: "{{ hostvars | dict2items | selectattr('value.arr_results', 'defined') | map(attribute='value.arr_results') | sum(start=[]) }}"
+      loop_control:
+        loop_var: csv_item
+      when: csv_item | length >= 5  # <-- Filtra elementos incompletos
 - name: Upload Files to Sharepoint
   hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
   gather_facts: true
