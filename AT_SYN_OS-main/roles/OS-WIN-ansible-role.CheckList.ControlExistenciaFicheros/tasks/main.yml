@@ -1,0 +1,86 @@
+---
+# tasks file for control_existencia_ficheros
+
+- name: Check Lectures LOCAL
+  block:
+    - name: Get date
+      ansible.builtin.set_fact:
+        file_name: "Lectures{{ lookup('pipe', 'date +%Y-%m-%d') }}.txt"
+
+    - name: Get current_epoch
+      ansible.builtin.set_fact:
+        current_epoch: "{{ lookup('pipe', 'date +%s') | int }}"
+
+    - name: Check local files
+      ansible.windows.win_stat:
+        path: '{{ file_path }}{{ file_name }}'
+      register: file_found
+
+    - name: Check status
+      ansible.builtin.debug:
+        msg: "File status: {{ file_found.stat }}"
+      failed_when:
+        - not file_found.stat.exists
+        - or (current_epoch - file_found.stat.lastwritetime > 21600)
+
+  rescue:
+    - name: Set failure facts
+      ansible.builtin.set_fact:
+        tk_result: 'NoPass'
+        tk_result_description: 'Fichero no existe en el servidor o la fecha de modificación no es correcta'
+        azure_check: true
+
+  always:
+    - name: Collect task results (LOCAL)
+      set_fact:
+        arr_results: >-
+          {{ arr_results | default([]) + [
+            [
+              checklist_code | string,
+              "Control ficheros",
+              1 | string,
+              "Control existencia ficheros LOCAL",
+              tk_result_description | default('Fallo desconocido'),
+              tk_result | default('Failed'),
+              inventory_hostname
+            ]
+          ] }}
+
+- name: Check Lectures AZURE
+  block:
+    - name: Check if exists in azure
+      ansible.windows.win_uri:
+        url: "{{ azure_url }}{{ file_name }}{{ sas_url }}"
+        method: HEAD
+        validate_certs: false
+      register: file_check_result
+
+    - name: DEBUG - File exists in Azure
+      ansible.builtin.debug:
+        msg: "COPIANDO FICHERO DESDE AZURE A LOCAL"
+      when: file_check_result.status == 200
+
+  rescue:
+    - name: Set Azure failure facts
+      ansible.builtin.set_fact:
+        tk_result: 'NoPass'
+        tk_result_description: "Fichero no existe en la ruta de Azure"
+        file_in_azure: false
+
+  when: azure_check | default(false)
+
+  always:
+    - name: Collect task results (AZURE)
+      ansible.builtin.set_fact:
+        arr_results: >-
+          {{ arr_results | default([]) + [
+            [
+              checklist_code,
+              "Control ficheros",
+              2,
+              "Control existencia ficheros AZURE",
+              tk_result_description | default('Fallo en Azure'),
+              tk_result | default('Failed'),
+              inventory_hostname
+            ]
+          ] }}

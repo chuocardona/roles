@@ -1,0 +1,26 @@
+---
+# OBJETIVO: Ejemplo playbook para role de OS-WIN-ansible-role.CheckList.Averias
+# ESCENARIO: Maquina de salto de Agbar
+# REQUISITOS: Ninguno
+#
+# INVENTARIO-CONFIG: grupos y variables que se deben incluir en el inventario preferentemente (y no como input-vars). 
+#                  Las variables opcionales se incluirán en el inventario, comentadas y con su valor por defecto. Indicar el tipo de cada variable.
+#     Grupos: grupos requeridos en el inventario.
+#     Group_vars: variables requeridas/opcionales. Indicar en cada caso de que tipo es (requerida/opcional), en que grupo debe ir (ALL u otros) y el tipo (integer, text, boolean, lista, diccionario). <Descripción>
+#        ALL:
+#         | Variable          | Required | Default                              | Choices       | Comments                                                                                       |
+#         |-------------------|----------|--------------------------------------|---------------|------------------------------------------------------------------------------------------------|
+#         | OPTION            | yes      | none                                 | externes, internes, sistematics              | Tipo de proceso a revisar                                       |
+#         | scheduled_task_name    | no      | VerificarServicio                |               | Nombre de la scheduled task del proceso (Normalmente no se debe cambiar)                       |
+#         | procs_ok         | no      | no                                     |               | Estado de los procesos del aplicativo (Normalmente no se debe cambiar)                         |
+#
+- name: TEST UPLOAD FILES
+  hosts: all
+  tasks:
+    - name: "Include role"
+      ansible.builtin.include_role:
+        name: OS-WIN-ansible-role.CheckList.Averias
+      vars:
+        OPTION: 'externes'
+        scheduled_task_name: 'VerificarServicio'
+        procs_ok: no

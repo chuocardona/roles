@@ -1,0 +1,10 @@
+---
+- name: "{{ sched_action }} Scheduled Task"
+  block:
+    - name: "{{ sched_action }} {{ scheduled_task_name }}"
+      ansible.windows.win_command: |
+        schtasks /Change /TN "{{ scheduled_task_name }}" /""{{ sched_action }}""
+      register: schedtask_rc
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ schedtask_rc.stdout}}"

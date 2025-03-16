@@ -1,0 +1,11 @@
+- name: ansible-role-event-socks-tunnel
+  src: git+https://github.kyndryl.net/Continuous-Engineering/ansible-role-event-socks-tunnel.git
+  version: 23.5/main
+- name: OS-LINUX-ansible-role.CSV.Dashboard
+  src: "https://github.kyndryl.net/automation-enterprisecu-SPAIN/AT_OS"
+  scm: 'git'
+  version: main 
+- name: ansible_role_sharepoint_upload
+  src: "https://github.kyndryl.net/Continuous-Engineering/ansible_role_sharepoint_upload.git"
+  scm: 'git'
+  version: issue_2811

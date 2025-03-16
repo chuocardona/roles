@@ -1,0 +1,11 @@
+---
+- name: Rename .xml.old to .xml
+  ansible.windows.win_command: |
+    rename "{{ xml_file.path }}" "{{ xml_file.path | regex_replace('\.old$', '') }}"
+  register: rename_output
+
+- name: Wait for the file to disappear
+  ansible.builtin.wait_for:
+    path: "{{ xml_file.path }}"
+    state: absent
+    timeout: 300

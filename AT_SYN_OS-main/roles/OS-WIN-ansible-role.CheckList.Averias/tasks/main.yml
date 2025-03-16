@@ -1,0 +1,38 @@
+- name: Starting ...
+  block:
+    - name: Set current date
+      ansible.builtin.set_fact:
+        current_timestamp: "{{ lookup('pipe', 'date +%d%m%Y%H%M') }}"
+    - name: DESHABILITANT TASCA PROGRAMADA {{ scheduled_task_name }}
+      ansible.builtin.include_tasks: manage_scheduled_task.yml
+      vars:
+        sched_action: DISABLE
+      when: OPTION == 'disable_scheduled_task'
+    - name: AVARIES EXTERNES
+      ansible.builtin.include_tasks: avaries_externes.yml
+      when: OPTION == 'externes'
+    - name: AVARIES INTERNES
+      ansible.builtin.include_tasks: avaries_internes.yml
+      when: OPTION == 'internes'
+    - name: AVARIES SISTEMATICS
+      ansible.builtin.include_tasks: avaries_sistematics.yml
+      when: OPTION == 'sistematics'
+    - name: Set return_code
+      ansible.builtin.set_fact:
+        end_rc: "NoPass"
+  rescue:
+    - name: Set return_code
+      ansible.builtin.set_fact:
+        end_rc: "Pass"
+  always:
+    - name: Write CSV
+      ansible.builtin.include_role:
+        name: OS-LINUX-ansible-role.CSV.Dashboard
+      vars:
+        fase: "create"
+        task_code: 1
+        task_name: "{{ OPTION }}"
+        task_description: "Revisa tareas de {{ OPTION }}"
+        task_result_description: "Revision ficheros/servicios de {{ OPTION }}"
+        task_result: "{{ end_rc }}"
+        execution_result: "NOOK"

@@ -1,0 +1,90 @@
+---
+- name: CheckServicio Sistematicos
+  ansible.builtin.include_tasks: check_proc_sistematics.yml
+
+- name: Iniciando Tareas
+  block:
+    - name: Revisando ficheros 
+      ansible.windows.win_find:
+        paths:
+          - 'D:\respostes\01\'
+          - 'D:\respostes\02\'
+          - 'D:\respostes\03\'
+          - 'D:\respostes\05\'
+          - 'D:\respostes\06\'
+          - 'D:\respostes\07\'
+          - 'D:\respostes\08\'
+          - 'D:\respostes\09\'
+          - 'D:\respostes\10\'
+          - 'D:\respostes\11\'
+          - 'D:\respostes\12\'
+          - 'D:\respostes\14\'
+          - 'D:\respostes\15\'
+        recurse: no
+        patterns: '*.job'
+      register: job_files
+
+    - name: Notificar si no se encuentran archivos JOB
+      ansible.builtin.debug:
+        msg: "No se encontraron archivos JOB en el directorio especificado."
+      when: job_files.matched == 0
+
+    - name: Stop Avaries Interiors
+      ansible.builtin.include_tasks: win_proc_exec.yml
+      vars:
+        script_path: 'D:\Parada y Arranque de Servicios\servicestop.bat'
+
+    - name: Rename JOB files to JOB.old
+      ansible.windows.win_command:
+        cmd: powershell -NoProfile -NonInteractive -Command "Rename-Item -Path '{{ item.path }}' -NewName '{{ item.path }}.old'"
+      loop: "{{ job_files.files }}"
+      when: job_files.matched > 0
+
+
+    - name: Start Avaries Interiors
+      ansible.builtin.include_tasks: win_proc_exec.yml
+      vars:
+        script_path: 'D:\Parada y Arranque de Servicios\service.bat'
+    
+    - name: Rename JOB.OLD files to JOB
+      ansible.windows.win_command:
+        cmd: powershell -NoProfile -NonInteractive  -Command "Rename-Item -Path '{{ item.path }}.old' '{{ item.path }}'"
+      loop: "{{ job_files.files }}"
+      when: job_files.matched > 0
+
+    - name: Check Avaries Processos Interiors
+      ansible.builtin.include_tasks: check_proc_sistematics.yml
+
+    - name: Pause for 30 seconds
+      ansible.builtin.pause:
+        seconds: 30
+
+    - name: Revisamos si se procesan los ficheros en de averias exteriores
+      ansible.windows.win_find:
+        paths:
+          - 'D:\respostes\01\'
+          - 'D:\respostes\02\'
+          - 'D:\respostes\03\'
+          - 'D:\respostes\05\'
+          - 'D:\respostes\06\'
+          - 'D:\respostes\07\'
+          - 'D:\respostes\08\'
+          - 'D:\respostes\09\'
+          - 'D:\respostes\10\'
+          - 'D:\respostes\11\'
+          - 'D:\respostes\12\'
+          - 'D:\respostes\14\'
+          - 'D:\respostes\15\'
+        recurse: no
+        patterns: '*.job'
+      register: actual_job_files
+
+    - name: DEBUG files
+      ansible.builtin.debug:
+        msg: "ACTUALES: {{ actual_job_files.matched }} ANTIGUOS: {{ job_files.matched }}"
+
+    - name: ERROR en la validacion procesamiento de ficheros
+      ansible.builtin.fail:
+        msg: "Los ficheros NO se estan procesando o estan tardando mas de lo habitual"
+      when: actual_job_files.matched >= job_files.matched and job_files.matched > 0
+  when: not procs_ok

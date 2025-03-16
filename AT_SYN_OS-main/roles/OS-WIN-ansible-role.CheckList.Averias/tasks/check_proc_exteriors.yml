@@ -1,0 +1,26 @@
+
+
+- name: Obteniendo proceso "AveriasExteriores"
+  ansible.windows.win_command:
+    cmd: powershell -NoNewWindow -Wait -Command "$processes = Get-Process | Where-Object { $_.Name -match 'AveriasExteriores*' }; $processes.count"
+  register: ext_procs
+
+- name: Obteniendo proceso "Java"
+  ansible.windows.win_command:
+    cmd: powershell -NoNewWindow -Wait -Command "$processes = Get-Process | Where-Object { $_.Name -match 'Java*' }; $processes.count"
+  register: java_procs
+
+- name: Obteniendo proceso "srvany"
+  ansible.windows.win_command:
+    cmd: powershell -NoNewWindow -Wait -Command "$processes = Get-Process | Where-Object { $_.Name -match 'srvany*' }; $processes.count"
+  register: srvany_procs
+
+- name: Validacion OK
+  ansible.builtin.set_fact:
+    procs_ok: true
+  when: ext_procs.stdout | int > 0 and java_procs.stdout | int == 3 and srvany_procs.stdout | int > 0 
+
+- name: ERROR los procesos no estan levantados correctamente
+  ansible.builtin.set_fact:
+    procs_ok: false #canviar a false
+  when: ext_procs.stdout | int == 0 or java_procs.stdout | int < 3 or srvany_procs.stdout | int == 0

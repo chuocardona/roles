@@ -1,0 +1,125 @@
+---
+- name: Check Avaries Processos Exteriors
+  ansible.builtin.include_tasks: check_proc_exteriors.yml
+
+- name: Iniciando Tareas
+  block:
+    - name: Disable scheduled task
+      ansible.builtin.include_tasks: manage_scheduled_task.yml
+      vars:
+        sched_action: DISABLE
+    - name: Revisando ficheros 
+      ansible.windows.win_find:
+          paths:
+            - 'D:\AVARIESEXT\Response\01\'
+            - 'D:\AVARIESEXT\Response\01\OK'
+            - 'D:\AVARIESEXT\Response\01\PROCESAR'
+            - 'D:\AVARIESEXT\Response\02\'
+            - 'D:\AVARIESEXT\Response\02\OK'
+            - 'D:\AVARIESEXT\Response\02\PROCESAR'
+            - 'D:\AVARIESEXT\Response\03\'
+            - 'D:\AVARIESEXT\Response\03\OK'
+            - 'D:\AVARIESEXT\Response\03\PROCESAR'
+            - 'D:\AVARIESEXT\Response\05\'
+            - 'D:\AVARIESEXT\Response\05\OK'
+            - 'D:\AVARIESEXT\Response\05\PROCESAR'
+            - 'D:\AVARIESEXT\Response\06\'
+            - 'D:\AVARIESEXT\Response\06\OK'
+            - 'D:\AVARIESEXT\Response\06\PROCESAR'
+          recurse: no
+          patterns: "*.xml"
+      register: xml_files
+
+    - name: Notificar si no se encuentran archivos XML
+      ansible.builtin.debug:
+        msg: "No se encontraron archivos XML en el directorio especificado."
+      when: xml_files.matched == 0
+
+    - name: Stop Avaries Exteriors
+      ansible.builtin.include_tasks: win_proc_exec.yml
+      vars:
+        script_path: 'C:\Parada y Arranque de Servicios\servicestop.bat'
+
+    - name: Rename XML files to XML.old
+      ansible.windows.win_command:
+        cmd: powershell -Command "Rename-Item -Path '{{ item.path }}' -NewName '{{ item.path }}.old'"
+      loop: "{{ xml_files.files }}"
+      when: xml_files.matched > 0
+
+
+    - name: Start Avaries Exteriors
+      ansible.builtin.include_tasks: win_proc_exec.yml
+      vars:
+        script_path: 'C:\Parada y Arranque de Servicios\service.bat'
+
+    #- name: Rename .xml.old files to .xml one by one
+    #  ansible.builtin.include_tasks: rename_and_wait.yml
+    #  loop: "{{ xml_files.files }}"
+    #  loop_control:
+    #    loop_var: xml_file
+    #  when: xml_files.matched > 0
+    
+    - name: Rename XML.OLD files to XML
+      ansible.windows.win_command:
+        cmd: powershell -Command "Rename-Item -Path '{{ item.path }}.old' '{{ item.path }}'"
+      loop: "{{ xml_files.files }}"
+      when: xml_files.matched > 0
+
+    - name: Check Avaries Processos Exteriors
+      ansible.builtin.include_tasks: check_proc_exteriors.yml
+  
+    #- name: Validacion final
+    #  ansible.builtin.fail:
+    #    msg: "Procesos no levantados correctamente, ejecutar procedimiento manualmente e informar del error"
+    #  when: not procs_ok 
+
+    - name: Pause for 30 seconds
+      ansible.builtin.pause:
+        seconds: 30
+
+    - name: Revisamos si se procesan los ficheros en de averias exteriores
+      ansible.windows.win_find:
+        paths:
+          - 'D:\AVARIESEXT\Response\01\'
+          - 'D:\AVARIESEXT\Response\01\OK'
+          - 'D:\AVARIESEXT\Response\01\PROCESAR'
+          - 'D:\AVARIESEXT\Response\02\'
+          - 'D:\AVARIESEXT\Response\02\OK'
+          - 'D:\AVARIESEXT\Response\02\PROCESAR'
+          - 'D:\AVARIESEXT\Response\03\'
+          - 'D:\AVARIESEXT\Response\03\OK'
+          - 'D:\AVARIESEXT\Response\03\PROCESAR'
+          - 'D:\AVARIESEXT\Response\05\'
+          - 'D:\AVARIESEXT\Response\05\OK'
+          - 'D:\AVARIESEXT\Response\05\PROCESAR'
+          - 'D:\AVARIESEXT\Response\06\'
+          - 'D:\AVARIESEXT\Response\06\OK'
+          - 'D:\AVARIESEXT\Response\06\PROCESAR'
+        recurse: no
+        patterns: "*.xml"
+      register: actual_xml_files
+
+    - name: DEBUG files
+      ansible.builtin.debug:
+        msg: "ACTUALES: {{ actual_xml_files.matched }} ANTIGUOS: {{ xml_files.matched }}"
+
+    - name: ERROR en la validacion procesamiento de ficheros
+      ansible.builtin.fail:
+        msg: "Los ficheros NO se estan procesando o estan tardando mas de lo habitual"
+      when: actual_xml_files.matched >= xml_files.matched and xml_files.matched > 0
+
+    - name: Enable scheduled task
+      ansible.builtin.include_tasks: manage_scheduled_task.yml
+      vars:
+        sched_action: ENABLE
+  when: not procs_ok
+
+#- name: Check after restart
+#  block:
+#    - name: Check Avaries Processos Exteriors
+#      ansible.builtin.include_tasks: check_proc_exteriors.yml
+#  
+#    - name: Validacion final
+#      ansible.builtin.fail:
+#        msg: "Procesos no levantados correctamente, ejecutar procedimiento manualmente e informar del error"
+#      when: not procs_ok

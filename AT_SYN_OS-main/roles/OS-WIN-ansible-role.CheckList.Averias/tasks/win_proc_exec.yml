@@ -1,0 +1,4 @@
+- name: "Executing {{ script_path }}"
+  ansible.windows.win_shell: |
+    powershell.exe -Command "Start-Process -FilePath '{{ script_path }}' -NoNewWindow -Wait"
+  register: ext_procs
