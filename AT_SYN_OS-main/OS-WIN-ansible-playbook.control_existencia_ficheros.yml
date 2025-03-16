@@ -60,7 +60,8 @@
         fase: "create"
         checklist_code: "{{ item[0] }}"
         task_name: "{{ item[1] }}"
-        task_code: "{{ item[2] }}"
+        #task_code: "{{ item[2] }}"
+        task_code: "{{ csv_item[2] }}"  # <-- Referencia correcta
         task_description: "{{ item[3] }}"
         task_result_description: "{{ item[4] }}"
         task_result: "{{ item[5] }}"
