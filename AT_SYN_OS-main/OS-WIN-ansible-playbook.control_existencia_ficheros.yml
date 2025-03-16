@@ -65,7 +65,7 @@
         task_description: "{{ csv_item[3] | default('Descripción no disponible') }}"
         task_result_description: "{{ csv_item[4] | default('N/A') }}"
         task_result: "{{ csv_item[4] | default('N/A') }}"
-      loop: "{{ hostvars | dict2items | selectattr('value.arr_results', 'defined') | map(attribute='value.arr_results') | sum(start=[]) | selectattr('length', '>=', 5) | default([]) }}"
+      loop: "{{ hostvars | dict2items | selectattr('value.arr_results', 'defined') | map(attribute='value.arr_results') | sum(start=[]) | selectattr('length', '>=', 5) }}"
       loop_control:
         loop_var: csv_item
       when: csv_item | length >= 5  # <-- Filtra elementos incompletos
