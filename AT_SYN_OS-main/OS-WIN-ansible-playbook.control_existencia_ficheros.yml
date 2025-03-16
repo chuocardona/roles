@@ -65,7 +65,8 @@
         task_result_description: "{{ item[4] }}"
         task_result: "{{ item[5] }}"
       loop: "{{ hostvars | dict2items | selectattr('value.arr_results', 'defined') | map(attribute='value.arr_results') | sum(start=[]) }}"
-
+      loop_control:
+        loop_var: csv_item
 - name: Upload Files to Sharepoint
   hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
   gather_facts: true
