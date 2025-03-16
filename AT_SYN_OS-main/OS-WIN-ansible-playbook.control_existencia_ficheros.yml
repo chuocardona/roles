@@ -27,7 +27,7 @@
 
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
   #hosts: win_host1 # Asegúrate que este host existe en tu inventario
-  hosts: windons
+  hosts: localhost
   gather_facts: true
   # become: true
   # become_method: ansible.builtin.runas
