@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for OS-LINUX-ansible-role.CSV.Dashboard
+- name: Write CSV
+  delegate_to: "{{ delegate_launch_node_linux | default('localhost') }}"
+  when: fase == 'create'
+  block:
+    - name: Check variables
+      ansible.builtin.debug:
+        msg: "{{ item }} --> {{ vars[item] }}"
+      with_items: "{{ required_vars }}"
+    
+    - name: Check variables
+      ansible.builtin.fail:
+        msg: "La variable {{ item }} no está definida"
+      when: ( vars[item] | default('')) == ''
+      with_items: "{{ required_vars }}"
+
+    - name: Set current date
+      ansible.builtin.set_fact:
+        current_timestamp: "{{ lookup('pipe', 'date +%d%m%Y%H%M%S') }}"
+    - name: Crear directorio para csv
+      become: false
+      ansible.builtin.file:
+        path: "{{ output_file_dir }}"
+        state: directory
+        mode: '0755'
+    - name: Crear CSV (J2)
+      become: false
+      ansible.builtin.template:
+        src: template-csv.j2
+        dest: "{{ output_file_dir }}/{{ output_file_name }}"
+        mode: '0755'
+    #- name: Check execution result to continue"
+    #  ansible.builtin.fail:
+    #    msg: "ERROR: Execution result is {{ execution_result }} because {{ task_name }} has failed "
+    #  when: execution_result is not match('OK', ignorecase=True) and task_result is not match('Pass', ignorecase=True)
+ 
+- name: Borrar directorio
+  ansible.builtin.file:
+    path: "{{ output_file_dir }}"
+    state: absent
+  when: fase == 'delete'

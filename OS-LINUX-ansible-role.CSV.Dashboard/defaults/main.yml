@@ -1,0 +1,8 @@
+---
+# defaults file for OS-LINUX-ansible-role.CSV.Dashboard
+
+job_id: 1
+client_code: "{{ gsma_code }}"
+output_file_dir: "/tmp/dashboard_out/{{ job_id }}"
+output_file_name: "{{ client_code }}_{{ checklist_code }}_{{ task_code }}_{{ current_timestamp }}.csv"
+execution_result: "OK"
