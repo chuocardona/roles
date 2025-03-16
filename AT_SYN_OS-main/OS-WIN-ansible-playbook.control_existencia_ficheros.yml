@@ -69,32 +69,7 @@
       loop_control:
         loop_var: csv_item
       when: csv_item | length >= 5  # <-- Filtra elementos incompletos
-- name: Upload Files to Sharepoint
-  hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
-  gather_facts: true
-  vars:
-    #job_id: 1
-    #gsma_code: 'SYN'
-    create_folder_in_sp: false
-    create_custom_folder: true
-    custom_folder_name: "{{ gsma_code }}"
-    upload_to_custom_folder: false
-    create_subfolder_in_sp: true
-    subfolder_name: "Checklist"
-    upload_to_subfolder: true
-    sharepoint_root_folder: 'at_role'
-    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
-    sp_teams_notification: false
-    tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
-  tasks:
-    - name: Upload to sharepoint
-      ansible.builtin.include_role:
-        name: ansible_role_sharepoint_upload
-      register: sp_upload_result
-      vars:
-        sp_client_id: "{{ username }}"
-        sp_client_secret: "{{ key }}"
-
+      
     # Nota: Esta tarea debería delegarse a un host Windows o usar un rol compatible con Linux
     - name: Delete Output Files
       ansible.builtin.include_role:
