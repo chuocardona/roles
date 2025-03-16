@@ -64,7 +64,7 @@
         task_name: "{{ csv_item[1] }}"
         task_code: "{{ csv_item[2] }}"
         task_description: "{{ csv_item[3] }}" 
-        #task_result_description: "{{ csv_item[4] }}"
+        task_result_description: "{{ csv_item[4] }}"
         task_result: "{{ csv_item[4] }}"
         #checklist_code: "{{ item[0] }}"
         #task_name: "{{ item[1] }}"
