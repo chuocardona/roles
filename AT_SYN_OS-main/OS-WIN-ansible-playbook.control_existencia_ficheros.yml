@@ -13,17 +13,6 @@
 #| sas_url           | yes      | None                                 |               | QueryString de la cadena SAS (Desde el "?" hasta el final http://google.es?image=123.png seria ?image=123.png|
 #| checklist_code    | no      | CHK-0044                                 |               | Codigo checklist|
 #| file_path         | no      |   \\srvdfs01\APLICACIONES\BIG_DATA_MDMB_PRO\MDMAB\Lectures\                               |               | Share del servidor local donde buscar el fichero inicialmente|
-#
-##- name: Socks tunnel
-#  hosts: localhost
-#  connection: local
-#  tasks:
-#    - name: Setup socks tunnel
-#      ansible.builtin.import_role:
-#        name: ansible-role-event-socks-tunnel
-#      vars:
-#        acc_id: "{{ blueid_shortcode }}"
-#        transaction_id: "{{ tower_job_id }}"
 
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
   hosts: win_host1 # Asegúrate que este host existe en tu inventario
@@ -68,7 +57,7 @@
       loop: "{{ hostvars | dict2items | selectattr('value.arr_results', 'defined') | map(attribute='value.arr_results') | sum(start=[]) }}"
       loop_control:
         loop_var: csv_item
-      when: csv_item | length >= 5  # <-- Filtra elementos incompletos
+      #when: csv_item | length >= 5  # <-- Filtra elementos incompletos
       
     # Nota: Esta tarea debería delegarse a un host Windows o usar un rol compatible con Linux
     - name: Delete Output Files
