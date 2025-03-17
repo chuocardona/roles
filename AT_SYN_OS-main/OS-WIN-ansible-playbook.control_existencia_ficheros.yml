@@ -1,4 +1,4 @@
----
+--
 # OBJETIVO: Ejemplo playbook para role de OS-WIN-ansible-role.CheckList.Averias
 # ESCENARIO: Maquina de salto de Agbar
 # REQUISITOS: Ninguno
@@ -13,6 +13,17 @@
 #| sas_url           | yes      | None                                 |               | QueryString de la cadena SAS (Desde el "?" hasta el final http://google.es?image=123.png seria ?image=123.png|
 #| checklist_code    | no      | CHK-0044                                 |               | Codigo checklist|
 #| file_path         | no      |   \\srvdfs01\APLICACIONES\BIG_DATA_MDMB_PRO\MDMAB\Lectures\                               |               | Share del servidor local donde buscar el fichero inicialmente|
+#
+##- name: Socks tunnel
+#  hosts: localhost
+#  connection: local
+#  tasks:
+#    - name: Setup socks tunnel
+#      ansible.builtin.import_role:
+#        name: ansible-role-event-socks-tunnel
+#      vars:
+#        acc_id: "{{ blueid_shortcode }}"
+#        transaction_id: "{{ tower_job_id }}"
 
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
   hosts: win_host1 # Asegúrate que este host existe en tu inventario
@@ -40,7 +51,7 @@
       loop: "{{ groups['windows'] | default([]) }}"
       loop_control:
         label: "{{ item }}"
-     # when: groups.windows is defined
+      when: groups.windows is defined
 
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
       include_role:
@@ -57,9 +68,38 @@
       loop: "{{ hostvars | dict2items | selectattr('value.arr_results', 'defined') | map(attribute='value.arr_results') | sum(start=[]) }}"
       loop_control:
         loop_var: csv_item
-      #when: csv_item | length >= 5  # <-- Filtra elementos incompletos
-      
+      when: csv_item | length >= 5  # <-- Filtra elementos incompletos
+- name: Upload Files to Sharepoint
+  hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
+  gather_facts: true
+  vars:
+    #job_id: 1
+    #gsma_code: 'SYN'
+    create_folder_in_sp: false
+    create_custom_folder: true
+    custom_folder_name: "{{ gsma_code }}"
+    upload_to_custom_folder: false
+    create_subfolder_in_sp: true
+    subfolder_name: "Checklist"
+    upload_to_subfolder: true
+    sharepoint_root_folder: 'at_role'
+    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
+    sp_teams_notification: false
+    tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
+  tasks:
+    - name: Upload to sharepoint
+      ansible.builtin.include_role:
+        name: ansible_role_sharepoint_upload
+      register: sp_upload_result
+      vars:
+        sp_client_id: "{{ username }}"
+        sp_client_secret: "{{ key }}"
+
     # Nota: Esta tarea debería delegarse a un host Windows o usar un rol compatible con Linux
-   
+    - name: Delete Output Files
+      ansible.builtin.include_role:
+        name: OS-LINUX-ansible-role.CSV.Dashboard  # Cambiado a un rol Linux
+      vars:
+        fase: "delete"
       when:
-        - sp_upload_result is defined and sp_upload_result is not none and sp_upload_result.failed | default(false) == true
+        - sp_upload_result is defined and sp_upload_result is not none and sp_upload_result.failed | default(false) == false
