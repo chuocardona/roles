@@ -60,10 +60,6 @@
       #when: csv_item | length >= 5  # <-- Filtra elementos incompletos
       
     # Nota: Esta tarea debería delegarse a un host Windows o usar un rol compatible con Linux
-    - name: Delete Output Files
-      ansible.builtin.include_role:
-        name: OS-LINUX-ansible-role.CSV.Dashboard  # Cambiado a un rol Linux
-      vars:
-        fase: "delete"
+   
       when:
         - sp_upload_result is defined and sp_upload_result is not none and sp_upload_result.failed | default(false) == true
