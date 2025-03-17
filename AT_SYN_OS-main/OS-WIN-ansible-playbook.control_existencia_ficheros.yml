@@ -66,4 +66,4 @@
       vars:
         fase: "delete"
       when:
-        - sp_upload_result is defined and sp_upload_result is not none and sp_upload_result.failed | default(false) == false
+        - sp_upload_result is defined and sp_upload_result is not none and sp_upload_result.failed | default(false) == true
