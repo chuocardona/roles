@@ -51,7 +51,7 @@
       loop: "{{ groups['windows'] | default([]) }}"
       loop_control:
         label: "{{ item }}"
-      when: groups.windows is defined
+     # when: groups.windows is defined
 
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
       include_role:
