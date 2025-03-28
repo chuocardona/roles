@@ -1,80 +1,89 @@
 ---
-# OBJETIVO: Ejemplo playbook para role de OS-WIN-ansible-role.CheckList.Averias
-# ESCENARIO: Maquina de salto de Agbar
-# REQUISITOS: Ninguno
+# OBJETIVO: Este playbook (OS-WIN-ansible-role.CheckList.Averias) está diseñado para realizar una serie de tareas relacionadas con:
+#            - Verificación de archivos en hosts Windows.
+#            - Generación de un archivo CSV con resultados.
+#            - Carga de resultados a SharePoint.
 #
-# INVENTARIO-CONFIG: grupos y variables que se deben incluir en el inventario preferentemente (y no como input-vars).
-#                  Las variables opcionales se incluirán en el inventario, comentadas y con su valor por defecto. Indicar el tipo de cada variable.
-#     Grupos: grupos requeridos en el inventario.
-#     Group_vars: variables requeridas/opcionales. Indicar en cada caso de que tipo es (requerida/opcional), en que grupo debe ir (ALL u otros) y el tipo (integer, text, boolean, lista, diccionario). <Descripción> #        ALL:
-#| Variable          | Required | Default                              | Choices       | Comments                                                                                       |
-#| :------------------: | :----------: |:--------------------------------------: | :---------------: | :------------------------------------------------------------------------------------------------: |
-#| azure_url         | no      |    https://mdmabpro01sa.file.core.windows.net/sicab/MDMAB/Lectures/                              |               | Url al container de azure donde se alberga el fichero de Lectures|
-#| sas_url           | yes      | None                                 |               | QueryString de la cadena SAS (Desde el "?" hasta el final http://google.es?image=123.png seria ?image=123.png|
-#| checklist_code    | no      | CHK-0044                                 |               | Codigo checklist|
-#| file_path         | no      |   \\srvdfs01\APLICACIONES\BIG_DATA_MDMB_PRO\MDMAB\Lectures\                               |               | Share del servidor local donde buscar el fichero inicialmente|
+# ESCENARIO: Entorno de ejecución controlado desde la máquina de salto de Agbar (Aigües de Barcelona).
 #
-##- name: Socks tunnel
-#  hosts: localhost
-#  connection: local
-#  tasks:
-#    - name: Setup socks tunnel
-#      ansible.builtin.import_role:
-#        name: ansible-role-event-socks-tunnel
-#      vars:
-#        acc_id: "{{ blueid_shortcode }}"
-#        transaction_id: "{{ tower_job_id }}"
-
+# REQUISITOS: 
+#     - Ejecución desde el servidor de salto corporativo de Aigües de Barcelona.
+#     - Conexión a hosts Windows con credenciales adecuadas.
+#     - Acceso al storage blob de Azure y a SharePoint.
+#
+# INVENTARIO-CONFIG:
+#     Grupos:
+#         - <tricode>_grp_INRA_AZURE  # Reemplazar <tricode> con el identificador del entorno
+#     Group_vars:
+#         - azure_url: "https://mdmabpro01sa.file.core.windows.net/sicab/MDMAB/Lectures/"   # URL fija del storage de Azure
+#         - file_path: "\\srvdfs01\APLICACIONES\BIG_DATA_MDMB_PRO\MDMAB\Lectures\"          # Ruta por defecto en hosts Windows
+#         - sharepoint_site_url: "https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam" # URL del sharepoint 
+#
+# CREDENCIALES-REQs:  # Valores sensibles (usar Ansible Vault)
+#     - sp_client_id: "<client_id_sharepoint>"           # ID de cliente para autenticación en SharePoint (string)
+#     - sp_client_secret: "<client_secret_sharepoint>"   # Secret para autenticación (string)
+#     - sas_url: "<cadena_SAS_azure>"                    # Cadena SAS para acceso al blob storage de Azure (string)
+#
+# INPUT-VARs-REQs:    # Variables obligatorias pasadas en tiempo de ejecución
+#     - job_id:  # ID único de ejecución (integer)
+#
+# INPUT-VARs-OPTs:    # Variables opcionales con valores por defecto
+#     - delegate_launch_node_linux: "localhost"  # Nodo de ejecución para tareas Linux
+#     - gsma_code: "SYN"  # Código GSMA por defecto
+#
+# NOTAS:
+#     - Las credenciales (sp_client_id, sp_client_secret, sas_url) deben encriptarse con Ansible Vault.
+#     - La ruta `file_path` puede modificarse desde el inventario si es necesario.
+#     - Para la ejecucion de este playbook llama a dos roles OS-LINUX-ansible-role.CSV.Dashboard  y role_sharepoint_upload 
+#
+#
+#
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
-  hosts: win_host1 # Asegúrate que este host existe en tu inventario
-  #hosts: localhost
+  hosts: server_hostname   #windows
   gather_facts: true
-  # become: true
-  # become_method: ansible.builtin.runas
   tasks:
     - name: CHECKLIST
       ansible.builtin.include_role:
         name: OS-WIN-ansible-role.CheckList.ControlExistenciaFicheros
 
 - name: Process results and call CSV Dashboard role
-  hosts: "{{ delegate_launch_node_linux | default('localhost') }}"
+  hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
   gather_facts: yes
   vars:
-    gsma_code: 'AIG'
-    client_code: 'AIG'  # <-- Variable requerida
-    job_id: "{{ ansible_date_time.epoch }}"  # <-- Variable requerida
-    current_timestamp: "{{ ansible_date_time.iso8601 }}"
+    checklist_code: 'CHK-0044'
   tasks:
-    - name: Debug arr_results
-      ansible.builtin.debug:
-        var: hostvars[item].arr_results
-      loop: "{{ groups['windows'] | default([]) }}"
-      loop_control:
-        label: "{{ item }}"
-      when: groups.windows is defined
-
+    - name: Initialize all_host_results
+      set_fact:
+        all_host_results: []        
+     #Luego, recopila los resultados de todos los hosts en Windows
+    - name: Collect results from Windows hosts
+      set_fact:
+        all_host_results: "{{ all_host_results + hostvars[item]['arr_results']|default([]) }}"
+      loop: "{{ groups['windows']|default([]) }}"
+      when: hostvars[item] is defined and hostvars[item]['arr_results'] is defined
+        
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
       include_role:
         name: OS-LINUX-ansible-role.CSV.Dashboard
       vars:
         fase: "create"
-        checklist_code: "{{ csv_item[0] | default('CHK-0044') }}"  # <-- Valor por defecto
-        client_code: "AIG"
-        task_name: "{{ csv_item[1] | default('Tarea no definida') }}"
-        task_code: "{{ csv_item[2] | default('CODE-0000') }}"
-        task_description: "{{ csv_item[3] | default('Descripción no disponible') }}" 
-        task_result_description: "{{ csv_item[4] | default('N/A') }}"
-        task_result: "{{ csv_item[4] | default('N/A') }}"
-      loop: "{{ hostvars | dict2items | selectattr('value.arr_results', 'defined') | map(attribute='value.arr_results') | sum(start=[]) }}"
-      loop_control:
-        loop_var: csv_item
-      when: csv_item | length >= 5  # <-- Filtra elementos incompletos
+        checklist_code: "{{ item[0] }}"
+        task_name: "{{ item[1] }}"
+        task_code: "{{ item[2] }}"
+        task_description: "{{ item[3] }}"
+        task_result_description: "{{ item[4] }}"
+        task_result: "{{ item[5] }}"
+      loop: "{{ all_host_results }}"
+    - name: Set all host results fact
+      set_fact:
+        all_host_results: "{{ all_host_results|default([]) + hostvars[item]['arr_results']|default([]) }}"
+      loop: "{{ groups['windows']|default([]) }}"
+      when: hostvars[item]['arr_results'] is defined 
+
 - name: Upload Files to Sharepoint
   hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
   gather_facts: true
   vars:
-    #job_id: 1
-    #gsma_code: 'SYN'
     create_folder_in_sp: false
     create_custom_folder: true
     custom_folder_name: "{{ gsma_code }}"
@@ -83,9 +92,10 @@
     subfolder_name: "Checklist"
     upload_to_subfolder: true
     sharepoint_root_folder: 'at_role'
-    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
+    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'  # Usar variable de inventario       
     sp_teams_notification: false
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
+ 
   tasks:
     - name: Upload to sharepoint
       ansible.builtin.include_role:
@@ -95,11 +105,17 @@
         sp_client_id: "{{ username }}"
         sp_client_secret: "{{ key }}"
 
-    # Nota: Esta tarea debería delegarse a un host Windows o usar un rol compatible con Linux
     - name: Delete Output Files
-      ansible.builtin.include_role:
-        name: OS-LINUX-ansible-role.CSV.Dashboard  # Cambiado a un rol Linux
-      vars:
-        fase: "delete"
-      when:
-        - sp_upload_result is defined and sp_upload_result is not none and sp_upload_result.failed | default(false) == false
+      block:
+        - name: Remove files using shell command
+          ansible.builtin.shell: 
+            cmd: rm -rf "{{ tower_src_path }}"
+          when: 
+             - sp_upload_result is defined 
+             - sp_upload_result is not none 
+             - sp_upload_result.failed | default(false) == false
+      rescue:
+        - name: Fallback removal method
+          ansible.builtin.file:
+            path: "/tmp/dashboard_out/{{ job_id }}"
+            state: absent
