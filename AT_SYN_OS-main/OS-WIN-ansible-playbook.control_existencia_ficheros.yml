@@ -97,6 +97,7 @@
   hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
   gather_facts: true
   vars:
+    job_id: 1
     create_folder_in_sp: false
     create_custom_folder: true
     custom_folder_name: "{{ gsma_code }}"
@@ -105,7 +106,7 @@
     subfolder_name: "Checklist"
     upload_to_subfolder: true
     sharepoint_root_folder: 'at_role'
-    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam/at_role/SYN/Checklist/'  # Usar variable de inventario
+    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'  # Usar variable de inventario
     sp_teams_notification: false
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
@@ -113,7 +114,7 @@
     - name: Upload to sharepoint
       ansible.builtin.include_role:
         name: ansible_role_sharepoint_upload
-      register: sp_upload_result
+      #register: sp_upload_result
       vars:
         sp_client_id: "{{ username }}"
         sp_client_secret: "{{ key }}"
