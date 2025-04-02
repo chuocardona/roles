@@ -15,9 +15,11 @@
 #     Grupos:
 #         - <tricode>_grp_INRA_AZURE  # Reemplazar <tricode> con el identificador del entorno
 #     Group_vars:
-#         - azure_url: "https://mdmabpro01sa.file.core.windows.net/sicab/MDMAB/Lectures/"   # URL fija del storage de Azure
-#         - file_path: "\\srvdfs01\APLICACIONES\BIG_DATA_MDMB_PRO\MDMAB\Lectures\"          # Ruta por defecto en hosts Windows
-#         - sharepoint_site_url: "https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam" # URL del sharepoint 
+#         - azure_url: "https://mdmabpro01sa.file.core.windows.net/sicab/MDMAB/Lectures/"   ## URL fija del storage de Azure  (string)
+#         - file_path: "\\srvdfs01\APLICACIONES\BIG_DATA_MDMB_PRO\MDMAB\Lectures\"          ## Share del servidor local donde buscar el fichero inicialmente (string)
+#         - sharepoint_site_url: "https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam" ## URL del sharepoint  (string)
+#         - server_hostname: srvtsadmpro01.agbar.ga.local         ## servidor Windows que se está gestionando (string)
+#         - tower_src_path: "/tmp/dashboard_out/{{ tower_job_id }}" ## Define la ruta local (en el nodo de control) donde se almacenan los archivos generados por el playbook (ej: CSV de resultados) (string)
 #
 # CREDENCIALES-REQs:  # Valores sensibles (usar Ansible Vault)
 #     - sp_client_id: "<client_id_sharepoint>"           # ID de cliente para autenticación en SharePoint (string)
@@ -29,7 +31,7 @@
 #
 # INPUT-VARs-OPTs:    # Variables opcionales con valores por defecto
 #     - delegate_launch_node_linux: "localhost"  # Nodo de ejecución para tareas Linux
-#     - gsma_code: "SYN"  # Código GSMA por defecto
+#     - gsma_code: "SYN"  # Código GSMA por defecto Se usa como nombre de carpeta principal dentro de la estructura de SharePoint (string) 
 #
 # NOTAS:
 #     - Las credenciales (sp_client_id, sp_client_secret, sas_url) deben encriptarse con Ansible Vault.
@@ -39,9 +41,16 @@
 #
 #
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
-  hosts: server_hostname   #windows
-  gather_facts: true
+  hosts: srvtsadmpro01
+  gather_facts: no
+  vars:
+    ansible_connection: winrm
+    ansible_port: 5986
+    ansible_winrm_server_cert_validation: ignore
   tasks:
+    - name: Probando conexión con win_ping
+      ansible.windows.win_ping:  
+  tasks:   
     - name: CHECKLIST
       ansible.builtin.include_role:
         name: OS-WIN-ansible-role.CheckList.ControlExistenciaFicheros
@@ -92,7 +101,7 @@
     subfolder_name: "Checklist"
     upload_to_subfolder: true
     sharepoint_root_folder: 'at_role'
-    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'  # Usar variable de inventario       
+    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam/at_role/SYN/Checklist'  # Usar variable de inventario
     sp_teams_notification: false
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
