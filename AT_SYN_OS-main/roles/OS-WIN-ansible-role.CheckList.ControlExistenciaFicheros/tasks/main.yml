@@ -61,6 +61,7 @@
         method: HEAD
         return_content: false
         validate_certs: false
+        status_code: [200, 404] 
       register: file_check_result
       failed_when: file_check_result.status_code is defined and file_check_result.status_code != 200
 
