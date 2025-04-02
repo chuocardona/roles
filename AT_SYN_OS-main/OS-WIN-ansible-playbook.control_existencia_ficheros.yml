@@ -40,6 +40,7 @@
 #
 #
 #
+#
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
   hosts: srvtsadmpro01
   gather_facts: no
