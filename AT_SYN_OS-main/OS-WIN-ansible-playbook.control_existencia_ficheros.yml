@@ -47,6 +47,10 @@
     ansible_connection: winrm
     ansible_port: 5986
     ansible_winrm_server_cert_validation: ignore
+    ansible_winrm_transport: ntlm
+    ansible_port: 5985  # HTTP
+    ansible_user: ansible
+    ansible_password: Zaq12wsx
   tasks:
     - name: Probando conexión con win_ping
       ansible.windows.win_ping:  
