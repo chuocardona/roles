@@ -41,7 +41,7 @@
 #
 #
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
-  hosts: srvtsadmpro01
+  hosts: SRVMDCPRO03
   gather_facts: no
   vars:
     ansible_connection: winrm
