@@ -105,7 +105,7 @@
     subfolder_name: "Checklist"
     upload_to_subfolder: true
     sharepoint_root_folder: 'at_role'
-    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam/at_role/SYN/Checklist'  # Usar variable de inventario
+    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam/at_role/SYN/Checklist/'  # Usar variable de inventario
     sp_teams_notification: false
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
