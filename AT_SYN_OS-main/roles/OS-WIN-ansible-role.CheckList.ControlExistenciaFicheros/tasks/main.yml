@@ -60,8 +60,9 @@
         url: "{{ azure_url }}{{ file_name }}{{ sas_url}}"
         method: HEAD
         return_content: false
+        validate_certs: false
       register: file_check_result
-      failed_when: execution_result.status != 200
+      failed_when: file_check_result.status_code is defined and file_check_result.status_code != 200
 
     - name: DEBUG
       ansible.builtin.debug:
