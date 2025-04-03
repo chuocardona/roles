@@ -53,7 +53,7 @@
      
     - name: Set windows_hosts fact
       ansible.builtin.set_fact:
-        windows_hosts: "{{ [inventory_hostname] if inventory_hostname == 'SRVMDCPRO03' else groups['windows']|default([]) }}"
+        windows_hosts: ["SRVMDCPRO03"]
      
     - name: Collect results from Windows hosts
       ansible.builtin.set_fact:
