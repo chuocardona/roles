@@ -11,6 +11,8 @@
     win_path: \srvdfs01\APLICACIONES\BIG_DATA_MDMB_PRO\MDMAB\Lectures\
     checklist_code: CHK-0044
     sharepoint_site_url: https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam
+    sp_client_id: 67b44fac-c6b7-42b3-b2c9-2c1a56266f5f
+    sp_client_secret: ouV8Q~9xUZjQyOUFsSA3c6ngtrz.ZnIi1P03ubWW
     temp_dir: ./temp_report
 
   tasks:
@@ -38,13 +40,13 @@
     - name: Subir reporte a SharePoint
       community.general.sharepoint_file:
         site_url: "{{ sharepoint_site_url }}"
+        client_id: "{{ sp_client_id }}"
+        client_secret: "{{ sp_client_secret }}"
         source: "{{ temp_dir }}/{{ checklist_code }}_report.csv"
         dest_folder: "Reportes/{{ checklist_code }}"
-        username: "{{ sharepoint_user }}"
-        password: "{{ sharepoint_pass }}"
       environment:
         REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
-      delegate_to: localhost  
+      delegate_to: localhost
 
     - name: Eliminar directorio temporal
       file:
