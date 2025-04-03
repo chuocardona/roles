@@ -101,15 +101,15 @@
   vars:
     job_id: 1
     create_folder_in_sp: false
-    create_custom_folder: true
+    create_custom_folder:  false ##true
     custom_folder_name: "{{ gsma_code }}"
     upload_to_custom_folder: false
-    create_subfolder_in_sp: true
+    create_subfolder_in_sp: false  ##true
     subfolder_name: "Checklist"
-    upload_to_subfolder: true
+    upload_to_subfolder: 1  ##true
     sharepoint_root_folder: 'at_role'
     sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'  # Usar variable de inventario
-    sp_teams_notification: false
+    sp_teams_notification: 0 ##false
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
   tasks:
