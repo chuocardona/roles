@@ -38,7 +38,6 @@
 #     - La ruta `file_path` puede modificarse desde el inventario si es necesario.
 #     - Para la ejecucion de este playbook llama a dos roles OS-LINUX-ansible-role.CSV.Dashboard  y role_sharepoint_upload 
 #
-#
 
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
   hosts: SRVMDCPRO03
@@ -66,9 +65,10 @@
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Ensure output directory exists (Linux task)
-      ansible.builtin.raw: mkdir -p {{ tower_src_path }}
-      args:
-        executable: /bin/bash
+      ansible.builtin.file:
+        path: "{{ tower_src_path }}"
+        state: directory
+        mode: '0755'
 
 - name: Process results and call CSV Dashboard role
   hosts: localhost
@@ -80,15 +80,15 @@
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Initialize all_host_results
-      set_fact:
+      ansible.builtin.set_fact:
         all_host_results: []
      
     - name: Set windows_hosts fact
-      set_fact:
+      ansible.builtin.set_fact:
         windows_hosts: "{{ [inventory_hostname] if inventory_hostname == 'SRVMDCPRO03' else groups['windows']|default([]) }}"
      
     - name: Collect results from Windows hosts
-      set_fact:
+      ansible.builtin.set_fact:
         all_host_results: "{{ all_host_results + hostvars[item]['arr_results']|default([]) }}"
       loop: "{{ windows_hosts|default([]) }}"
       when: 
@@ -96,9 +96,9 @@
         - hostvars[item]['arr_results'] is defined
     
     - name: Create placeholder file if no results
-      ansible.builtin.raw: echo 'No results found in this execution' > {{ tower_src_path }}/no_results.txt
-      args:
-        executable: /bin/bash
+      ansible.builtin.copy:
+        content: 'No results found in this execution'
+        dest: "{{ tower_src_path }}/no_results.txt"
       when: all_host_results | length == 0
         
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
@@ -136,23 +136,23 @@
   tasks:
     # Verificar que el directorio existe
     - name: Verify directory existence
-      ansible.builtin.raw: if [ -d {{ tower_src_path }} ]; then echo "exists"; else echo "not_exists"; fi
-      args:
-        executable: /bin/bash
+      ansible.builtin.stat:
+        path: "{{ tower_src_path }}"
       register: dir_check
 
     # Si el directorio no existe, crear un archivo de muestra para evitar errores
     - name: Create directory if it doesn't exist
-      ansible.builtin.raw: mkdir -p {{ tower_src_path }}
-      args:
-        executable: /bin/bash
-      when: "'not_exists' in dir_check.stdout"
+      ansible.builtin.file:
+        path: "{{ tower_src_path }}"
+        state: directory
+        mode: '0755'
+      when: not dir_check.stat.exists
           
     - name: Create placeholder file
-      ansible.builtin.raw: echo 'Placeholder file created by playbook' > {{ tower_src_path }}/placeholder.txt
-      args:
-        executable: /bin/bash
-      when: "'not_exists' in dir_check.stdout"
+      ansible.builtin.copy:
+        content: 'Placeholder file created by playbook'
+        dest: "{{ tower_src_path }}/placeholder.txt"
+      when: not dir_check.stat.exists
 
     - name: Upload to sharepoint
       ansible.builtin.include_role:
@@ -165,9 +165,9 @@
       ignore_errors: true
 
     - name: Delete Output Files
-      ansible.builtin.raw: rm -rf {{ tower_src_path }}
-      args:
-        executable: /bin/bash
+      ansible.builtin.file:
+        path: "{{ tower_src_path }}"
+        state: absent
       when: 
          - sp_upload_result is defined 
          - sp_upload_result is not none 
