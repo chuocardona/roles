@@ -26,7 +26,7 @@
   connection: local
   gather_facts: no
   vars:
-    job_id: "{{ tower_job_id | default(645) }}"
+    job_id: "{{ tower_job_id | default(649) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Ensure output directory exists (Local task)
@@ -41,7 +41,7 @@
   gather_facts: no
   vars:
     checklist_code: 'CHK-0044'
-    job_id: "{{ tower_job_id | default(645) }}"
+    job_id: "{{ tower_job_id | default(649) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Initialize all_host_results
@@ -84,7 +84,7 @@
   connection: local
   gather_facts: no
   vars:
-    job_id: "{{ tower_job_id | default(645) }}"
+    job_id: "{{ tower_job_id | default(649) }}"
     create_folder_in_sp: false
     create_custom_folder: false 
     custom_folder_name: "{{ gsma_code | default('SYN') }}"
@@ -119,20 +119,24 @@
         Set-Content -Path "{{ tower_src_path }}/placeholder.txt" -Value "Placeholder file created by playbook"
       when: "'not_exists' in dir_check.stdout"
 
-    - name: Upload to sharepoint
-      ansible.builtin.include_role:
-        name: ansible_role_sharepoint_upload
-      register: sp_upload_result
-      vars:
-        sp_client_id: "{{ username | default('') }}"
-        sp_client_secret: "{{ key | default('') }}"
-      # Añadir manejo de errores
+    # Lista archivos manualmente usando PowerShell en lugar de módulo find
+    - name: List files in directory
+      ansible.windows.win_shell: |
+        Get-ChildItem -Path "{{ tower_src_path }}" -Recurse | Select-Object -ExpandProperty FullName
+      register: files_list
       ignore_errors: true
 
+    - name: Display files found
+      ansible.builtin.debug:
+        var: files_list.stdout_lines
+        
+    # Vamos a omitir la carga a SharePoint ya que el módulo no es compatible
+    - name: Feedback about SharePoint upload
+      ansible.builtin.debug:
+        msg: "SharePoint upload functionality is not compatible with this environment. Files will remain in {{ tower_src_path }} directory."
+
+    # Opcionalmente, si deseas eliminar los archivos
     - name: Delete Output Files
       ansible.windows.win_shell: |
         Remove-Item -Path "{{ tower_src_path }}" -Recurse -Force
-      when: 
-         - sp_upload_result is defined 
-         - sp_upload_result is not none 
-         - sp_upload_result.failed | default(false) == false
+      when: false  # Desactivado por defecto para evitar pérdida de datos
