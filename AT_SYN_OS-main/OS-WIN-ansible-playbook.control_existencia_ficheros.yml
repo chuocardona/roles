@@ -100,8 +100,8 @@
           ansible.builtin.include_role:
             name: ansible_role_sharepoint_upload
           vars:
-            sp_client_id: "{{ sharepoint_client_id | default('') }}"
-            sp_client_secret: "{{ sharepoint_client_secret | default('') }}"
+            sp_client_id: "67b44fac-c6b7-42b3-b2c9-2c1a56266f5f"
+            sp_client_secret: "ouV8Q~9xUZjQyOUFsSA3c6ngtrz.ZnIi1P03ubWW"
             sp_site_url: "{{ sharepoint_site_url }}"
             sp_folder_path: "at_role/Checklist"
             local_file_path: "{{ tower_src_path }}"
