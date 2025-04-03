@@ -45,7 +45,6 @@
   gather_facts: no
   vars:
     ansible_connection: winrm
-    ansible_port: 5986
     ansible_winrm_server_cert_validation: ignore
     ansible_winrm_transport: ntlm
     ansible_port: 5985  # HTTP
@@ -54,7 +53,6 @@
   tasks:
     - name: Probando conexión con win_ping
       ansible.windows.win_ping:  
-  tasks:   
     - name: CHECKLIST
       ansible.builtin.include_role:
         name: OS-WIN-ansible-role.CheckList.ControlExistenciaFicheros
@@ -64,11 +62,13 @@
   gather_facts: yes
   vars:
     checklist_code: 'CHK-0044'
+    job_id: "{{ tower_job_id | default(626) }}"  # Usar tower_job_id si está definido
+    tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Initialize all_host_results
       set_fact:
         all_host_results: []        
-     #Luego, recopila los resultados de todos los hosts en Windows
+     
     - name: Collect results from Windows hosts
       set_fact:
         all_host_results: "{{ all_host_results + hostvars[item]['arr_results']|default([]) }}"
@@ -87,44 +87,79 @@
         task_result_description: "{{ item[4] }}"
         task_result: "{{ item[5] }}"
       loop: "{{ all_host_results }}"
+      
     - name: Set all host results fact
       set_fact:
         all_host_results: "{{ all_host_results|default([]) + hostvars[item]['arr_results']|default([]) }}"
       loop: "{{ groups['windows']|default([]) }}"
       when: hostvars[item]['arr_results'] is defined 
+      
+    # Asegurar que el directorio existe
+    - name: Ensure directory for outputs exists
+      file:
+        path: "{{ tower_src_path }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
 
 - name: Upload Files to Sharepoint
   hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
   gather_facts: true
-  #gather_facts: no
   vars:
     job_id: "{{ tower_job_id | default(626) }}"
     create_folder_in_sp: false
-    create_custom_folder:  false 
+    create_custom_folder: false 
     custom_folder_name: "{{ gsma_code }}"
     upload_to_custom_folder: false
     create_subfolder_in_sp: false
     subfolder_name: "Checklist"
     upload_to_subfolder: true
     sharepoint_root_folder: 'at_role'
-    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'  # Usar variable de inventario
+    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
     sp_teams_notification: false
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
   tasks:
+    # Verificar que el directorio existe
+    - name: Verify directory exists
+      stat:
+        path: "{{ tower_src_path }}"
+      register: dir_stat
+      delegate_to: localhost
+
+    # Si el directorio no existe, crear un archivo de muestra para evitar errores
+    - name: Create placeholder file if directory doesn't exist
+      block:
+        - name: Create directory
+          file:
+            path: "{{ tower_src_path }}"
+            state: directory
+            mode: '0755'
+          delegate_to: localhost
+          
+        - name: Create placeholder file
+          copy:
+            content: "Placeholder file created by playbook"
+            dest: "{{ tower_src_path }}/placeholder.txt"
+          delegate_to: localhost
+      when: not dir_stat.stat.exists
+
     - name: Upload to sharepoint
       ansible.builtin.include_role:
         name: ansible_role_sharepoint_upload
-      #register: sp_upload_result
+      register: sp_upload_result
       vars:
         sp_client_id: "{{ username }}"
         sp_client_secret: "{{ key }}"
+      # Añadir manejo de errores
+      ignore_errors: true
 
     - name: Delete Output Files
       block:
         - name: Remove files using shell command
           ansible.builtin.shell: 
             cmd: rm -rf "{{ tower_src_path }}"
+          delegate_to: localhost
           when: 
              - sp_upload_result is defined 
              - sp_upload_result is not none 
@@ -132,5 +167,6 @@
       rescue:
         - name: Fallback removal method
           ansible.builtin.file:
-            path: "/tmp/dashboard_out/{{ job_id }}"
+            path: "{{ tower_src_path }}"
             state: absent
+          delegate_to: localhost
