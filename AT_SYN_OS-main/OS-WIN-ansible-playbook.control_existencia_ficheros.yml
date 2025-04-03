@@ -2,7 +2,7 @@
 # OBJETIVO: Este playbook está diseñado para realizar una serie de tareas relacionadas con:
 #            - Verificación de archivos en hosts Windows.
 #            - Generación de un archivo CSV con resultados.
-#            - Guardar resultados en una ubicación persistente del servidor.
+#            - Guardar resultados en una ubicación accesible del servidor.
 
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
   hosts: SRVMDCPRO03
@@ -25,31 +25,17 @@
   hosts: localhost
   connection: local
   gather_facts: no
-  become: yes  # Activamos become para poder crear directorios en ubicaciones del sistema
+  # No usar become: yes para evitar problemas de permisos
   vars:
     job_id: "{{ tower_job_id | default(649) }}"
-    # Ruta persistente para guardar los CSV
-    csv_dir: "/var/lib/awx/csv_reports"
+    # Usar una ruta donde el usuario que ejecuta AWX tenga permisos
+    csv_dir: "/tmp/csv_reports"
     csv_file: "{{ csv_dir }}/control_existencia_ficheros_{{ job_id }}.csv"
   tasks:
     - name: Ensure output directory exists
-      ansible.builtin.file:
-        path: "{{ csv_dir }}"
-        state: directory
-        mode: '0755'
-        # Ajusta el propietario según lo que sea apropiado para tu sistema
-        owner: root
-        group: root
-      register: dir_result
-      ignore_errors: yes
-      
-    - name: Debug directory creation result
-      ansible.builtin.debug:
-        var: dir_result
-        
-    - name: Alternative - Create directory with shell
       ansible.builtin.shell: "mkdir -p {{ csv_dir }}"
-      when: dir_result.failed is defined and dir_result.failed
+      args:
+        creates: "{{ csv_dir }}"
       
     - name: Initialize all_host_results
       ansible.builtin.set_fact:
@@ -88,25 +74,12 @@
     - name: Show CSV file content
       ansible.builtin.shell: "cat {{ csv_file }}"
       register: csv_content
-      delegate_to: localhost
       when: all_host_results | length > 0
   
     - name: Display CSV content
       ansible.builtin.debug:
         var: csv_content.stdout_lines
-      delegate_to: localhost
       when: all_host_results | length > 0
-
-    # Establecer permisos adecuados para que el archivo sea accesible
-    - name: Ensure proper permissions on CSV file
-      ansible.builtin.file:
-        path: "{{ csv_file }}"
-        mode: '0644'
-        # Ajusta si es necesario para que sea accesible por los usuarios que necesitan leerlo
-        owner: root
-        group: root
-      when: all_host_results | length > 0
-      ignore_errors: yes
 
     - name: Show path to access the file
       ansible.builtin.debug:
