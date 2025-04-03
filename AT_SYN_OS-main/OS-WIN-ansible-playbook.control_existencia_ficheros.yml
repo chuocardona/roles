@@ -63,12 +63,9 @@
   vars:
     job_id: "{{ tower_job_id | default(634) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
-    ansible_connection: local
   tasks:
     - name: Ensure output directory exists (Linux task)
-      ansible.builtin.shell: "mkdir -p {{ tower_src_path }}"
-      args:
-        executable: /bin/bash
+      ansible.builtin.shell: mkdir -p {{ tower_src_path }}
 
 - name: Process results and call CSV Dashboard role
   hosts: localhost
@@ -78,7 +75,6 @@
     checklist_code: 'CHK-0044'
     job_id: "{{ tower_job_id | default(634) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
-    ansible_connection: local
   tasks:
     - name: Initialize all_host_results
       ansible.builtin.set_fact:
@@ -97,9 +93,7 @@
         - hostvars[item]['arr_results'] is defined
     
     - name: Create placeholder file if no results
-      ansible.builtin.shell: "echo 'No results found in this execution' > {{ tower_src_path }}/no_results.txt"
-      args:
-        executable: /bin/bash
+      ansible.builtin.shell: echo 'No results found in this execution' > {{ tower_src_path }}/no_results.txt
       when: all_host_results | length == 0
         
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
@@ -133,27 +127,20 @@
     sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
     sp_teams_notification: false
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
-    ansible_connection: local
  
   tasks:
     # Verificar que el directorio existe
     - name: Verify directory existence
-      ansible.builtin.shell: "if [ -d {{ tower_src_path }} ]; then echo 'exists'; else echo 'not_exists'; fi"
-      args:
-        executable: /bin/bash
+      ansible.builtin.shell: if [ -d {{ tower_src_path }} ]; then echo "exists"; else echo "not_exists"; fi
       register: dir_check
 
     # Si el directorio no existe, crear un archivo de muestra para evitar errores
     - name: Create directory if it doesn't exist
-      ansible.builtin.shell: "mkdir -p {{ tower_src_path }}"
-      args:
-        executable: /bin/bash
+      ansible.builtin.shell: mkdir -p {{ tower_src_path }}
       when: "'not_exists' in dir_check.stdout"
           
     - name: Create placeholder file
-      ansible.builtin.shell: "echo 'Placeholder file created by playbook' > {{ tower_src_path }}/placeholder.txt"
-      args:
-        executable: /bin/bash
+      ansible.builtin.shell: echo 'Placeholder file created by playbook' > {{ tower_src_path }}/placeholder.txt
       when: "'not_exists' in dir_check.stdout"
 
     - name: Upload to sharepoint
@@ -167,9 +154,7 @@
       ignore_errors: true
 
     - name: Delete Output Files
-      ansible.builtin.shell: "rm -rf {{ tower_src_path }}"
-      args:
-        executable: /bin/bash
+      ansible.builtin.shell: rm -rf {{ tower_src_path }}
       when: 
          - sp_upload_result is defined 
          - sp_upload_result is not none 
