@@ -13,10 +13,10 @@
         path: '{{ file_path }}{{ file_name }}'
       register: file_found
       
-    - name: Check status
-      ansible.windows.win_stat:
-        path: '{{ file_path }}{{ file_name }}'
-      failed_when: not file_found.stat.exists or (current_epoch | int - file_found.stat.lastwritetime > 21600)
+    #- name: Check status
+    #  ansible.windows.win_stat:
+     #   path: '{{ file_path }}{{ file_name }}'
+      #failed_when: not file_found.stat.exists or (current_epoch | int - file_found.stat.lastwritetime > 21600)
   
     - name: DEBUG
       ansible.builtin.debug:
