@@ -11,7 +11,7 @@
     ansible_connection: winrm
     ansible_winrm_server_cert_validation: ignore
     ansible_winrm_transport: ntlm
-    ansible_port: 5986  # HTTPS (cambiado a 5986 para conexión segura)
+    ansible_port: 5986  # HTTPS (conexión segura)
     ansible_user: ansible
     ansible_password: Zaq12wsx
   tasks:
@@ -21,30 +21,32 @@
       ansible.builtin.include_role:
         name: OS-WIN-ansible-role.CheckList.ControlExistenciaFicheros
 
-- name: Prepare CSV output directory
+- name: Prepare CSV output directory and generate file
   hosts: localhost
   connection: local
   gather_facts: no
+  become: no  # Importante: desactivamos "become" para evitar problemas de permisos
   vars:
-    job_id: "{{ tower_job_id | default(649) }}"
-    csv_dir: "/tmp/job"
-  tasks:
-    - name: Ensure output directory exists (Local task)
-      ansible.builtin.file:
-        path: "{{ csv_dir }}"
-        state: directory
-        mode: '0755'
-
-- name: Process results and generate CSV file
-  hosts: localhost
-  connection: local
-  gather_facts: no
-  vars:
-    checklist_code: 'CHK-0044'
     job_id: "{{ tower_job_id | default(649) }}"
     csv_dir: "/tmp/job"
     csv_file: "{{ csv_dir }}/control_existencia_ficheros_{{ job_id }}.csv"
   tasks:
+    - name: Ensure output directory exists
+      ansible.builtin.file:
+        path: "{{ csv_dir }}"
+        state: directory
+        mode: '0755'
+      register: dir_result
+      ignore_errors: yes
+      
+    - name: Debug directory creation result
+      ansible.builtin.debug:
+        var: dir_result
+        
+    - name: Alternative - Create directory with shell
+      ansible.builtin.shell: "mkdir -p {{ csv_dir }}"
+      when: dir_result.failed is defined and dir_result.failed
+      
     - name: Initialize all_host_results
       ansible.builtin.set_fact:
         all_host_results: []
@@ -62,21 +64,15 @@
         - hostvars[item]['arr_results'] is defined
     
     - name: Create placeholder file if no results
-      ansible.builtin.copy:
-        content: "No results found in this execution"
-        dest: "{{ csv_dir }}/no_results_{{ job_id }}.txt"
+      ansible.builtin.shell: "echo 'No results found in this execution' > {{ csv_dir }}/no_results_{{ job_id }}.txt"
       when: all_host_results | length == 0
         
     - name: Generate CSV file with headers
-      ansible.builtin.copy:
-        content: "checklist_code,task_name,task_code,task_description,task_result_description,task_result\n"
-        dest: "{{ csv_file }}"
+      ansible.builtin.shell: "echo 'checklist_code,task_name,task_code,task_description,task_result_description,task_result' > {{ csv_file }}"
       when: all_host_results | length > 0
         
     - name: Append results to CSV file
-      ansible.builtin.lineinfile:
-        path: "{{ csv_file }}"
-        line: "{{ item[0] }},{{ item[1] }},{{ item[2] }},{{ item[3] }},{{ item[4] }},{{ item[5] }}"
+      ansible.builtin.shell: "echo '{{ item[0] }},{{ item[1] }},{{ item[2] }},{{ item[3] }},{{ item[4] }},{{ item[5] }}' >> {{ csv_file }}"
       loop: "{{ all_host_results }}"
       when: all_host_results | length > 0
 
