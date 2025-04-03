@@ -94,22 +94,21 @@
       when: hostvars[item]['arr_results'] is defined 
 
 - name: Upload Files to Sharepoint
-  #hosts: SRVMDCPRO03
   hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
   gather_facts: true
   #gather_facts: no
   vars:
-    job_id: 1
+    job_id: "{{ tower_job_id | default(626) }}"
     create_folder_in_sp: false
-    create_custom_folder:  false ##true
+    create_custom_folder:  false 
     custom_folder_name: "{{ gsma_code }}"
     upload_to_custom_folder: false
-    create_subfolder_in_sp: false  ##true
+    create_subfolder_in_sp: false
     subfolder_name: "Checklist"
-    upload_to_subfolder: 1  ##true
+    upload_to_subfolder: true
     sharepoint_root_folder: 'at_role'
     sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'  # Usar variable de inventario
-    sp_teams_notification: 0 ##false
+    sp_teams_notification: false
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
   tasks:
