@@ -36,16 +36,23 @@
       vars:
         files: "{{ win_files.files }}"
       delegate_to: localhost
+      
+    - name: Leer contenido del reporte CSV
+      slurp:
+        src: "{{ temp_dir }}/{{ checklist_code }}_report.csv"
+      register: report_content
+      delegate_to: localhost
 
     - name: Subir reporte a SharePoint
-      community.general.sharepoint_file:
-        site_url: "{{ sharepoint_site_url }}"
-        client_id: "{{ sp_client_id }}"
-        client_secret: "{{ sp_client_secret }}"
-        source: "{{ temp_dir }}/{{ checklist_code }}_report.csv"
-        dest_folder: "Reportes/{{ checklist_code }}"
-      environment:
-        REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+      uri:
+        url: "{{ sharepoint_site_url }}/_api/web/getfolderbyserverrelativeurl('Reportes/{{ checklist_code }}')/files/add(overwrite=true, url='{{ checklist_code }}_report.csv')"
+        method: POST
+        body: "{{ report_content['content'] | b64decode }}"
+        body_format: raw
+        headers:
+          Authorization: "Bearer {{ sharepoint_access_token }}"
+          Accept: "application/json;odata=verbose"
+          Content-Type: "text/csv"
       delegate_to: localhost
 
     - name: Eliminar directorio temporal
