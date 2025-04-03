@@ -58,11 +58,12 @@
         name: OS-WIN-ansible-role.CheckList.ControlExistenciaFicheros
 
 - name: Process results and call CSV Dashboard role
-  hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
+  hosts: localhost
+  connection: local
   gather_facts: yes
   vars:
     checklist_code: 'CHK-0044'
-    job_id: "{{ tower_job_id | default(626) }}"  # Usar tower_job_id si está definido
+    job_id: "{{ tower_job_id | default(628) }}"  # Usar tower_job_id si está definido
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Initialize all_host_results
@@ -74,6 +75,14 @@
         all_host_results: "{{ all_host_results + hostvars[item]['arr_results']|default([]) }}"
       loop: "{{ groups['windows']|default([]) }}"
       when: hostvars[item] is defined and hostvars[item]['arr_results'] is defined
+      
+    # Asegurar que el directorio existe (con local_action para ejecutar en control node)
+    - name: Ensure directory for outputs exists
+      local_action:
+        module: file
+        path: "{{ tower_src_path }}"
+        state: directory
+        mode: '0755'
         
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
       include_role:
@@ -87,26 +96,21 @@
         task_result_description: "{{ item[4] }}"
         task_result: "{{ item[5] }}"
       loop: "{{ all_host_results }}"
+      when: all_host_results | length > 0
       
-    - name: Set all host results fact
-      set_fact:
-        all_host_results: "{{ all_host_results|default([]) + hostvars[item]['arr_results']|default([]) }}"
-      loop: "{{ groups['windows']|default([]) }}"
-      when: hostvars[item]['arr_results'] is defined 
-      
-    # Asegurar que el directorio existe
-    - name: Ensure directory for outputs exists
-      file:
-        path: "{{ tower_src_path }}"
-        state: directory
-        mode: '0755'
-      delegate_to: localhost
+    - name: Create placeholder file if no results
+      local_action:
+        module: copy
+        content: "No results found in this execution"
+        dest: "{{ tower_src_path }}/no_results.txt"
+      when: all_host_results | length == 0
 
 - name: Upload Files to Sharepoint
-  hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
-  gather_facts: true
+  hosts: localhost
+  connection: local
+  gather_facts: no
   vars:
-    job_id: "{{ tower_job_id | default(626) }}"
+    job_id: "{{ tower_job_id | default(628) }}"
     create_folder_in_sp: false
     create_custom_folder: false 
     custom_folder_name: "{{ gsma_code }}"
@@ -120,28 +124,27 @@
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
   tasks:
-    # Verificar que el directorio existe
+    # Verificar que el directorio existe utilizando local_action
     - name: Verify directory exists
-      stat:
+      local_action:
+        module: stat
         path: "{{ tower_src_path }}"
       register: dir_stat
-      delegate_to: localhost
 
     # Si el directorio no existe, crear un archivo de muestra para evitar errores
     - name: Create placeholder file if directory doesn't exist
-      block:
-        - name: Create directory
-          file:
-            path: "{{ tower_src_path }}"
-            state: directory
-            mode: '0755'
-          delegate_to: localhost
+      local_action:
+        module: file
+        path: "{{ tower_src_path }}"
+        state: directory
+        mode: '0755'
+      when: not dir_stat.stat.exists
           
-        - name: Create placeholder file
-          copy:
-            content: "Placeholder file created by playbook"
-            dest: "{{ tower_src_path }}/placeholder.txt"
-          delegate_to: localhost
+    - name: Create placeholder file
+      local_action:
+        module: copy
+        content: "Placeholder file created by playbook"
+        dest: "{{ tower_src_path }}/placeholder.txt"
       when: not dir_stat.stat.exists
 
     - name: Upload to sharepoint
@@ -157,16 +160,16 @@
     - name: Delete Output Files
       block:
         - name: Remove files using shell command
-          ansible.builtin.shell: 
+          local_action:
+            module: shell
             cmd: rm -rf "{{ tower_src_path }}"
-          delegate_to: localhost
           when: 
              - sp_upload_result is defined 
              - sp_upload_result is not none 
              - sp_upload_result.failed | default(false) == false
       rescue:
         - name: Fallback removal method
-          ansible.builtin.file:
+          local_action:
+            module: file
             path: "{{ tower_src_path }}"
             state: absent
-          delegate_to: localhost
