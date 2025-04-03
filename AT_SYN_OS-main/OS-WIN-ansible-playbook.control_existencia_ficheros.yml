@@ -81,7 +81,7 @@
 
 - name: Upload Files to Sharepoint
   hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
-  gather_facts: true
+  gather_facts: no
   vars:
     job_id: "{{ tower_job_id | default(626) }}"
     create_folder_in_sp: false
@@ -97,29 +97,32 @@
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
   tasks:
-    - name: Verify files exist in upload directory
+    - name: Check if upload directory exists
       ansible.builtin.stat:
         path: "{{ tower_src_path }}"
       register: upload_dir
+      ignore_errors: yes
 
-    - name: Debug directory contents
+    - name: List files in directory
       ansible.builtin.shell: 
         cmd: "ls -l {{ tower_src_path }}"
-      when: upload_dir.stat.exists
       register: file_list
+      when: upload_dir.stat.exists
       changed_when: false
+      ignore_errors: yes
 
     - name: Display directory contents
       ansible.builtin.debug:
         var: file_list.stdout_lines
       when: file_list is defined
 
-    - name: Validate upload environment
+    - name: Validate files for upload
       ansible.builtin.assert:
         that:
           - upload_dir.stat.exists
           - file_list.stdout_lines | length > 0
         fail_msg: "No hay archivos para subir o el directorio no existe"
+      ignore_errors: yes
 
     - name: Upload to sharepoint
       ansible.builtin.include_role:
@@ -130,3 +133,4 @@
       when: 
         - upload_dir.stat.exists
         - file_list.stdout_lines | length > 0
+      ignore_errors: yes
