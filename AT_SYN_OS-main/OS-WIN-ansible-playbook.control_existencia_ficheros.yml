@@ -140,3 +140,52 @@
       ansible.windows.win_shell: |
         Remove-Item -Path "{{ tower_src_path }}" -Recurse -Force
       when: false  # Desactivado por defecto para evitar pérdida de datos
+
+      ---
+# [Contenido del playbook original]
+# ... [playbooks anteriores]
+
+- name: Upload Files to Sharepoint
+  hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
+  gather_facts: true
+  vars:
+    job_id: "{{ tower_job_id | default(626) }}"
+    create_folder_in_sp: false
+    create_custom_folder: false 
+    custom_folder_name: "{{ gsma_code | default('SYN') }}"
+    upload_to_custom_folder: false
+    create_subfolder_in_sp: false
+    subfolder_name: "Checklist"
+    upload_to_subfolder: true
+    sharepoint_root_folder: 'at_role'
+    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
+    sp_teams_notification: false
+    tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
+ 
+  tasks:
+    - name: Verify files exist in upload directory
+      ansible.builtin.stat:
+        path: "{{ tower_src_path }}"
+      register: upload_dir
+
+    - name: Debug directory contents
+      ansible.builtin.shell: 
+        cmd: "ls -l {{ tower_src_path }}"
+      when: upload_dir.stat.exists
+      register: file_list
+      changed_when: false
+
+    - name: Display directory contents
+      ansible.builtin.debug:
+        var: file_list.stdout_lines
+      when: file_list is defined
+
+    - name: Upload to sharepoint
+      ansible.builtin.include_role:
+        name: ansible_role_sharepoint_upload
+      vars:
+        sp_client_id: "{{ username }}"
+        sp_client_secret: "{{ key }}"
+      when: 
+        - upload_dir.stat.exists
+        - file_list.stdout_lines | length > 0
