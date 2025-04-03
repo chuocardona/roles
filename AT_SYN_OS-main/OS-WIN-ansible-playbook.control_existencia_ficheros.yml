@@ -26,7 +26,7 @@
   connection: local
   gather_facts: no
   vars:
-    job_id: "{{ tower_job_id | default(677) }}"
+    job_id: "{{ tower_job_id | default(679) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Ensure output directory exists (Local task)
@@ -41,7 +41,7 @@
   gather_facts: no
   vars:
     checklist_code: 'CHK-0044'
-    job_id: "{{ tower_job_id | default(677) }}"
+    job_id: "{{ tower_job_id | default(679) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Initialize all_host_results
@@ -84,7 +84,7 @@
   connection: local
   gather_facts: no
   vars:
-    job_id: "{{ tower_job_id | default(677) }}"
+    job_id: "{{ tower_job_id | default(679) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
     sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
 
@@ -106,7 +106,9 @@
             sp_folder_path: "at_role/Checklist"
             local_file_path: "{{ tower_src_path }}"
           register: sp_upload_result
-          when: sp_upload_directory.stat.exists and sp_upload_directory.stat.isdir
+          when: 
+            - sp_upload_directory.stat.exists
+            - sp_upload_directory.stat.isdir
 
       rescue:
         - name: Log SharePoint upload failure
