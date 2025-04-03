@@ -1,188 +1,53 @@
 ---
-# OBJETIVO: Este playbook (OS-WIN-ansible-role.CheckList.Averias) está diseñado para realizar una serie de tareas relacionadas con:
-#            - Verificación de archivos en hosts Windows.
-#            - Generación de un archivo CSV con resultados.
-#            - Carga de resultados a SharePoint.
-
-- name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
-  hosts: SRVMDCPRO03
+- name: Verificar archivos en servidor Windows y subir reporte a SharePoint
+  hosts: "{{ win_server }}"
   gather_facts: no
+
   vars:
+    ansible_user: "{{ win_user }}"
+    ansible_password: "{{ win_pass }}"
     ansible_connection: winrm
     ansible_winrm_server_cert_validation: ignore
-    ansible_winrm_transport: ntlm
-    ansible_port: 5985  # HTTP
-    ansible_user: ansible
-    ansible_password: Zaq12wsx
-  tasks:
-    - name: Probar conexión con win_ping
-      ansible.windows.win_ping:  
-    - name: Ejecutar checklist de control de existencia de ficheros
-      ansible.builtin.include_role:
-        name: OS-WIN-ansible-role.CheckList.ControlExistenciaFicheros
+    win_path: \srvdfs01\APLICACIONES\BIG_DATA_MDMB_PRO\MDMAB\Lectures\
+    checklist_code: CHK-0044
+    sharepoint_site_url: https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam
+    temp_dir: ./temp_report
 
-- name: Preparar directorio de salida CSV
-  hosts: localhost
-  connection: local
-  gather_facts: no
-  vars:
-    output_base_dir: "/tmp/dashboard_out"
-    job_id: "{{ tower_job_id | default(683) }}"
-    tower_src_path: "{{ output_base_dir }}/{{ job_id }}"
   tasks:
-    - name: Asegurar que el directorio base de salida existe
-      ansible.builtin.file:
-        path: "{{ output_base_dir }}"
+
+    - name: Crear directorio temporal para reporte
+      file:
+        path: "{{ temp_dir }}"
         state: directory
-        mode: '0755'
+      delegate_to: localhost
 
-    - name: Asegurar que el directorio de salida específico del job existe
-      ansible.builtin.file:
-        path: "{{ tower_src_path }}"
-        state: directory
-        mode: '0755'
+    - name: Obtener lista de archivos en servidor Windows
+      win_find:
+        path: "{{ win_path }}"
+        file_type: file
+      register: win_files
 
-    - name: Verificar la creación del directorio
-      ansible.builtin.stat:
-        path: "{{ tower_src_path }}"
-      register: directory_check
-
-    - name: Mostrar información del directorio
-      ansible.builtin.debug:
-        msg:
-          - "Directorio base: {{ output_base_dir }}"
-          - "Directorio específico del job: {{ tower_src_path }}"
-          - "El directorio existe: {{ directory_check.stat.exists }}"
-
-- name: Procesar resultados y llamar al rol CSV Dashboard
-  hosts: localhost
-  connection: local
-  gather_facts: no
-  vars:
-    checklist_code: 'CHK-0044'
-    job_id: "{{ tower_job_id | default(683) }}"
-    tower_src_path: "{{ output_base_dir }}/{{ job_id }}"
-  tasks:
-    - name: Inicializar all_host_results
-      ansible.builtin.set_fact:
-        all_host_results: []
-     
-    - name: Establecer el fact windows_hosts
-      ansible.builtin.set_fact:
-        windows_hosts: "{{ groups['windows']|default([]) if inventory_hostname != 'SRVMDCPRO03' else [inventory_hostname] }}"
-     
-    - name: Recopilar resultados de los hosts Windows
-      ansible.builtin.set_fact:
-        all_host_results: "{{ all_host_results + hostvars[item]['arr_results']|default([]) }}"
-      loop: "{{ windows_hosts|default([]) }}"
-      when: 
-        - hostvars[item] is defined
-        - hostvars[item]['arr_results'] is defined
-    
-    - name: Crear archivo de marcador de posición si no hay resultados
-      ansible.builtin.copy:
-        content: "No se encontraron resultados en esta ejecución"
-        dest: "{{ tower_src_path }}/no_results.txt"
-      when: all_host_results | length == 0
-        
-    - name: Llamar a OS-LINUX-ansible-role.CSV.Dashboard para cada resultado
-      ansible.builtin.include_role:
-        name: OS-LINUX-ansible-role.CSV.Dashboard
+    - name: Generar reporte CSV
+      ansible.builtin.template:
+        src: report_template.csv.j2
+        dest: "{{ temp_dir }}/{{ checklist_code }}_report.csv"
       vars:
-        fase: "create"
-        checklist_code: "{{ item[0] }}"
-        task_name: "{{ item[1] }}"
-        task_code: "{{ item[2] }}"
-        task_description: "{{ item[3] }}"
-        task_result_description: "{{ item[4] }}"
-        task_result: "{{ item[5] }}"
-      loop: "{{ all_host_results }}"
-      when: all_host_results | length > 0
+        files: "{{ win_files.files }}"
+      delegate_to: localhost
 
-- name: Subir archivos a Sharepoint
-  hosts: localhost
-  connection: local
-  gather_facts: no
-  vars:
-    job_id: "{{ tower_job_id | default(683) }}"
-    tower_src_path: "{{ output_base_dir }}/{{ job_id }}"
-    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
+    - name: Subir reporte a SharePoint
+      community.general.sharepoint_file:
+        site_url: "{{ sharepoint_site_url }}"
+        source: "{{ temp_dir }}/{{ checklist_code }}_report.csv"
+        dest_folder: "Reportes/{{ checklist_code }}"
+        username: "{{ sharepoint_user }}"
+        password: "{{ sharepoint_pass }}"
+      environment:
+        REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+      delegate_to: localhost  
 
-  tasks:
-    - name: Validar directorio de carga
-      block:
-        - name: Verificar si existen archivos en el directorio de carga de SharePoint
-          ansible.builtin.stat:
-            path: "{{ tower_src_path }}"
-          register: sp_upload_directory
-
-        - name: Mostrar información del directorio de carga
-          ansible.builtin.debug:
-            msg: 
-              - "Directorio de carga: {{ tower_src_path }}"
-              - "El directorio existe: {{ sp_upload_directory.stat.exists | default(false) }}"
-              - "Es un directorio: {{ sp_upload_directory.stat.isdir | default(false) }}"
-
-        - name: Listar contenido del directorio
-          ansible.builtin.find:
-            path: "{{ tower_src_path }}"
-          register: directory_contents
-
-        - name: Mostrar contenido del directorio
-          ansible.builtin.debug:
-            var: directory_contents.files
-
-    - name: Subir a SharePoint
-      block:
-        - name: Validar prerrequisitos de carga
-          ansible.builtin.assert:
-            that:
-              - sp_upload_directory.stat is defined
-              - sp_upload_directory.stat.exists
-              - sp_upload_directory.stat.isdir
-            fail_msg: "No se cumplen los prerrequisitos de carga de SharePoint"
-
-        - name: Incluir rol de carga de SharePoint
-          ansible.builtin.include_role:
-            name: ansible_role_sharepoint_upload
-          vars:
-            sp_client_id: "67b44fac-c6b7-42b3-b2c9-2c1a56266f5f"
-            sp_client_secret: "ouV8Q~9xUZjQyOUFsSA3c6ngtrz.ZnIi1P03ubWW"
-            sp_site_url: "{{ sharepoint_site_url }}"
-            sp_folder_path: "at_role/Checklist"
-            local_file_path: "{{ tower_src_path }}"
-          register: sp_upload_result
-          when: 
-            - sp_upload_directory.stat.exists | default(false)
-            - sp_upload_directory.stat.isdir | default(false)
-
-      rescue:
-        - name: Registrar fallo de carga de SharePoint
-          ansible.builtin.debug:
-            msg: 
-              - "La carga de SharePoint falló"
-              - "Detalles del error: {{ ansible_failed_result }}"
-              - "Directorio de carga: {{ tower_src_path }}"
-              - "El directorio existe: {{ sp_upload_directory.stat.exists | default('Desconocido') }}"
-              - "Es un directorio: {{ sp_upload_directory.stat.isdir | default('Desconocido') }}"
-
-    - name: Limpiar archivos cargados
-      block:
-        - name: Eliminar archivos locales después de una carga exitosa
-          ansible.builtin.file:
-            path: "{{ tower_src_path }}"
-            state: absent
-          when: 
-            - sp_upload_result is defined
-            - sp_upload_result.changed | default(false)
-      rescue:
-        - name: Registrar error de eliminación de archivos
-          ansible.builtin.debug:
-            msg: "Error al eliminar los archivos cargados: {{ ansible_failed_result }}"
-
-    - name: Notificación final
-      ansible.builtin.debug:
-        msg: >
-          Proceso de carga de SharePoint completado.
-          Estado de carga: {{ sp_upload_result.changed | default('No intentado') }}.
-          Ubicación de los archivos: {{ tower_src_path }}
+    - name: Eliminar directorio temporal
+      file:
+        path: "{{ temp_dir }}"
+        state: absent
+      delegate_to: localhost
