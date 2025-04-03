@@ -41,11 +41,19 @@
         state: directory
         mode: '0755'
 
+    - name: Verify directory creation
+      ansible.builtin.command:
+        cmd: "ls -ld {{ tower_src_path }}"
+      register: directory_check
+      changed_when: false
+      ignore_errors: yes
+
     - name: Debug directory information
       ansible.builtin.debug:
         msg:
           - "Base directory: /tmp/dashboard_out"
           - "Job-specific directory: {{ tower_src_path }}"
+          - "Directory check: {{ directory_check.stdout | default('No output') }}"
 
 - name: Process results and call CSV Dashboard role
   hosts: localhost
