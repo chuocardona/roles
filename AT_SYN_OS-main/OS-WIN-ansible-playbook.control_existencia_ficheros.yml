@@ -26,7 +26,7 @@
   connection: local
   gather_facts: no
   vars:
-    job_id: "{{ tower_job_id | default(649) }}"
+    job_id: "{{ tower_job_id | default(677) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Ensure output directory exists (Local task)
@@ -41,7 +41,7 @@
   gather_facts: no
   vars:
     checklist_code: 'CHK-0044'
-    job_id: "{{ tower_job_id | default(649) }}"
+    job_id: "{{ tower_job_id | default(677) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Initialize all_host_results
@@ -84,60 +84,52 @@
   connection: local
   gather_facts: no
   vars:
-    job_id: "{{ tower_job_id | default(649) }}"
-    create_folder_in_sp: false
-    create_custom_folder: false 
-    custom_folder_name: "{{ gsma_code | default('SYN') }}"
-    upload_to_custom_folder: false
-    create_subfolder_in_sp: false
-    subfolder_name: "Checklist"
-    upload_to_subfolder: true
-    sharepoint_root_folder: 'at_role'
-    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
-    sp_teams_notification: false
+    job_id: "{{ tower_job_id | default(677) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
- 
+    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
+
   tasks:
-    # Verificar que el directorio existe
-    - name: Verify directory existence
-      ansible.windows.win_shell: |
-        if (Test-Path -Path "{{ tower_src_path }}") {
-          Write-Output "exists"
-        } else {
-          Write-Output "not_exists"
-        }
-      register: dir_check
+    - name: Check if files exist in SharePoint upload directory
+      ansible.builtin.stat:
+        path: "{{ tower_src_path }}"
+      register: sp_upload_directory
 
-    # Si el directorio no existe, crear un archivo de muestra para evitar errores
-    - name: Create directory if it doesn't exist
-      ansible.windows.win_shell: |
-        New-Item -Path "{{ tower_src_path }}" -ItemType Directory -Force
-      when: "'not_exists' in dir_check.stdout"
-          
-    - name: Create placeholder file
-      ansible.windows.win_shell: |
-        Set-Content -Path "{{ tower_src_path }}/placeholder.txt" -Value "Placeholder file created by playbook"
-      when: "'not_exists' in dir_check.stdout"
+    - name: Upload to SharePoint
+      block:
+        - name: Include SharePoint upload role
+          ansible.builtin.include_role:
+            name: ansible_role_sharepoint_upload
+          vars:
+            sp_client_id: "{{ sharepoint_client_id | default('') }}"
+            sp_client_secret: "{{ sharepoint_client_secret | default('') }}"
+            sp_site_url: "{{ sharepoint_site_url }}"
+            sp_folder_path: "at_role/Checklist"
+            local_file_path: "{{ tower_src_path }}"
+          register: sp_upload_result
+          when: sp_upload_directory.stat.exists and sp_upload_directory.stat.isdir
 
-    # Lista archivos manualmente usando PowerShell en lugar de módulo find
-    - name: List files in directory
-      ansible.windows.win_shell: |
-        Get-ChildItem -Path "{{ tower_src_path }}" -Recurse | Select-Object -ExpandProperty FullName
-      register: files_list
-      ignore_errors: true
+      rescue:
+        - name: Log SharePoint upload failure
+          ansible.builtin.debug:
+            msg: "SharePoint upload failed: {{ ansible_failed_result }}"
 
-    - name: Display files found
+    - name: Cleanup uploaded files
+      block:
+        - name: Remove local files after successful upload
+          ansible.builtin.file:
+            path: "{{ tower_src_path }}"
+            state: absent
+          when: 
+            - sp_upload_result is defined
+            - sp_upload_result.changed | default(false)
+      rescue:
+        - name: Log file removal error
+          ansible.builtin.debug:
+            msg: "Error removing uploaded files: {{ ansible_failed_result }}"
+
+    - name: Final notification
       ansible.builtin.debug:
-        var: files_list.stdout_lines
-        
-    # Vamos a omitir la carga a SharePoint ya que el módulo no es compatible
-    - name: Feedback about SharePoint upload
-      ansible.builtin.debug:
-        msg: "SharePoint upload functionality is not compatible with this environment. Files will remain in {{ tower_src_path }} directory."
-
-    # Opcionalmente, si deseas eliminar los archivos
-    - name: Delete Output Files
-      ansible.windows.win_shell: |
-        Remove-Item -Path "{{ tower_src_path }}" -Recurse -Force
-      when: false  # Desactivado por defecto para evitar pérdida de datos
-
+        msg: >
+          SharePoint upload process completed. 
+          Upload status: {{ sp_upload_result.changed | default('Not attempted') }}. 
+          Files location: {{ tower_src_path }}
