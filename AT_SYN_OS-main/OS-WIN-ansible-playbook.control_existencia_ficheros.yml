@@ -41,9 +41,9 @@
         state: directory
         mode: '0755'
 
-    - name: Debug directories
+    - name: Debug directory information
       ansible.builtin.debug:
-        msg: 
+        msg:
           - "Base directory: /tmp/dashboard_out"
           - "Job-specific directory: {{ tower_src_path }}"
 
@@ -112,7 +112,10 @@
 
         - name: Debug upload directory information
           ansible.builtin.debug:
-            var: sp_upload_directory
+            msg: 
+              - "Upload directory: {{ tower_src_path }}"
+              - "Directory exists: {{ sp_upload_directory.stat.exists | default(false) }}"
+              - "Is directory: {{ sp_upload_directory.stat.isdir | default(false) }}"
 
         - name: List directory contents
           ansible.builtin.shell: 
