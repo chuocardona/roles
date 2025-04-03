@@ -94,7 +94,8 @@
       when: hostvars[item]['arr_results'] is defined 
 
 - name: Upload Files to Sharepoint
-  hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
+  hosts: SRVMDCPRO03
+  #hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
   gather_facts: true
   vars:
     job_id: 1
