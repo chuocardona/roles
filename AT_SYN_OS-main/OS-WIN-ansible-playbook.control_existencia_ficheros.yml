@@ -2,7 +2,7 @@
 # OBJETIVO: Este playbook está diseñado para realizar una serie de tareas relacionadas con:
 #            - Verificación de archivos en hosts Windows.
 #            - Generación de un archivo CSV con resultados.
-#            - Guardar resultados en una ubicación accesible del servidor.
+#            - Guardar resultados en AWX.
 
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
   hosts: SRVMDCPRO03
@@ -25,17 +25,14 @@
   hosts: localhost
   connection: local
   gather_facts: no
-  # No usar become: yes para evitar problemas de permisos
+  become: no  # Desactivamos explícitamente become
   vars:
     job_id: "{{ tower_job_id | default(649) }}"
-    # Usar una ruta donde el usuario que ejecuta AWX tenga permisos
     csv_dir: "/tmp/csv_reports"
     csv_file: "{{ csv_dir }}/control_existencia_ficheros_{{ job_id }}.csv"
   tasks:
     - name: Ensure output directory exists
-      ansible.builtin.shell: "mkdir -p {{ csv_dir }}"
-      args:
-        creates: "{{ csv_dir }}"
+      ansible.builtin.raw: "mkdir -p {{ csv_dir }}"
       
     - name: Initialize all_host_results
       ansible.builtin.set_fact:
@@ -54,15 +51,15 @@
         - hostvars[item]['arr_results'] is defined
     
     - name: Create placeholder file if no results
-      ansible.builtin.shell: "echo 'No results found in this execution' > {{ csv_dir }}/no_results_{{ job_id }}.txt"
+      ansible.builtin.raw: "echo 'No results found in this execution' > {{ csv_dir }}/no_results_{{ job_id }}.txt"
       when: all_host_results | length == 0
         
     - name: Generate CSV file with headers
-      ansible.builtin.shell: "echo 'checklist_code,task_name,task_code,task_description,task_result_description,task_result' > {{ csv_file }}"
+      ansible.builtin.raw: "echo 'checklist_code,task_name,task_code,task_description,task_result_description,task_result' > {{ csv_file }}"
       when: all_host_results | length > 0
         
     - name: Append results to CSV file
-      ansible.builtin.shell: "echo '{{ item[0] }},{{ item[1] }},{{ item[2] }},{{ item[3] }},{{ item[4] }},{{ item[5] }}' >> {{ csv_file }}"
+      ansible.builtin.raw: "echo '{{ item[0] }},{{ item[1] }},{{ item[2] }},{{ item[3] }},{{ item[4] }},{{ item[5] }}' >> {{ csv_file }}"
       loop: "{{ all_host_results }}"
       when: all_host_results | length > 0
 
@@ -72,14 +69,14 @@
       when: all_host_results | length > 0
 
     - name: Show CSV file content
-      ansible.builtin.shell: "cat {{ csv_file }}"
+      ansible.builtin.raw: "cat {{ csv_file }}"
       register: csv_content
       when: all_host_results | length > 0
   
     - name: Display CSV content
       ansible.builtin.debug:
         var: csv_content.stdout_lines
-      when: all_host_results | length > 0
+      when: csv_content is defined and csv_content.stdout_lines is defined
 
     - name: Show path to access the file
       ansible.builtin.debug:
