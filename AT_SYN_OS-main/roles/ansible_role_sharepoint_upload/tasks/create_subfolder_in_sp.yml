@@ -1,0 +1,43 @@
+---
+- name: Check mandatory variables
+  ansible.builtin.debug:
+    msg:
+      - "[{{ 'subfolder_name OK' if (not (subfolder_name == '')) else 'subfolder_name ERROR' }}]"
+  failed_when:
+    - (subfolder_name == '')
+
+- name: Create sub folder in SharePoint if not exists - Folder
+  ansible.builtin.uri:
+    url: "{{ sharepoint_site_url }}/_api/web/GetFolderByServerRelativeUrl('{{ sharepoint_root_folder }}/{{ sp_dir_create }}')/folders"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ access_token }}"
+      Accept: "application/json;odata=verbose"
+      Content-Type: "application/json"
+      X-RequestDigest: "{{ digest_code }}"
+    body_format: json
+    body: |
+      {
+        "ServerRelativeUrl": "{{ subfolder_name }}"
+      }
+  register: result_sub_folder
+  failed_when: result_sub_folder.status not in [200, 201]
+  when: not (create_custom_folder)
+
+- name: Create sub folder in SharePoint if not exists - Custom Folder
+  ansible.builtin.uri:
+    url: "{{ sharepoint_site_url }}/_api/web/GetFolderByServerRelativeUrl('{{ sharepoint_root_folder }}/{{ custom_folder_name }}')/folders"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ access_token }}"
+      Accept: "application/json;odata=verbose"
+      Content-Type: "application/json"
+      X-RequestDigest: "{{ digest_code }}"
+    body_format: json
+    body: |
+      {
+        "ServerRelativeUrl": "{{ subfolder_name }}"
+      }
+  register: result_sub_folder
+  failed_when: result_sub_folder.status not in [200, 201]
+  when: create_custom_folder
