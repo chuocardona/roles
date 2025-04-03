@@ -5,16 +5,13 @@
     "summary": "{{ teams_summary }}",
 	  "title": "{{ teams_title }}",
     "sections": [{
-        "activityTitle": "Sharepoint Delete file Status",
+        "activityTitle": "Sharepoint Upload Status",
         "facts": [{
             "name": "Status",
-            "value": "{{ sharepoint_delete_status_msg }}"
+            "value": "{{ sharepoint_upload_status_msg }}"
         },{
-            "name": "Successfully Deleted Files",
-            "value": "{{ sharepoint_deleted_files }}"
-        },{
-            "name": "Deletion Failed Files",
-            "value": "{{ sharepoint_delete_failed_files }}"
+            "name": "Sharepoint URL",
+            "value": "{{ sharepoint_download_url }}"
         }],
         "potentialAction": [
             {
@@ -23,6 +20,14 @@
                 "name": "View in Ansible Tower",
                 "target": [
                     "{{ tower_host }}/{{ tower_job_suffix }}"
+                ]
+            },
+            {
+                "@context": "http://schema.org",
+                "@type": "ViewAction",
+                "name": "View in SharePoint",
+                "target": [
+                    "{{ sharepoint_download_url }}"
                 ]
             }
         ],
