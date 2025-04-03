@@ -30,10 +30,10 @@
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Ensure output directory exists (Local task)
-      ansible.windows.win_shell: |
-        if (-not (Test-Path -Path "{{ tower_src_path }}")) {
-          New-Item -Path "{{ tower_src_path }}" -ItemType Directory -Force
-        }
+      ansible.builtin.file:
+        path: "{{ tower_src_path }}"
+        state: directory
+        mode: '0755'
 
 - name: Process results and call CSV Dashboard role
   hosts: localhost
@@ -61,8 +61,9 @@
         - hostvars[item]['arr_results'] is defined
     
     - name: Create placeholder file if no results
-      ansible.windows.win_shell: |
-        Set-Content -Path "{{ tower_src_path }}/no_results.txt" -Value "No results found in this execution"
+      ansible.builtin.copy:
+        content: "No results found in this execution"
+        dest: "{{ tower_src_path }}/no_results.txt"
       when: all_host_results | length == 0
         
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
@@ -79,7 +80,7 @@
       loop: "{{ all_host_results }}"
       when: all_host_results | length > 0
 
-- name: Upload Files to Sharepoint
+- name: Upload Files to SharePoint
   hosts: localhost
   gather_facts: no
   vars:
@@ -97,41 +98,52 @@
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
   tasks:
-    - name: Ensure upload directory exists
-      ansible.builtin.file:
+    - name: Verify upload directory exists
+      ansible.builtin.stat:
         path: "{{ tower_src_path }}"
-        state: directory
-      register: directory_check
+      register: upload_dir
+      ignore_errors: yes
 
     - name: List files in directory
       ansible.builtin.shell: 
         cmd: "ls -l {{ tower_src_path }}"
       register: file_list
+      when: upload_dir.stat is defined and upload_dir.stat.exists
       changed_when: false
       ignore_errors: yes
 
-    - name: Display directory contents
+    - name: Debug directory contents
       ansible.builtin.debug:
         var: file_list.stdout_lines
       when: file_list is defined
 
-    - name: Validate files for upload
+    - name: Upload to SharePoint
       block:
-        - name: Check file existence
+        - name: Validate files for upload
           ansible.builtin.assert:
             that:
               - file_list.stdout_lines | length > 0
-            fail_msg: "No hay archivos para subir en el directorio"
+            fail_msg: "No hay archivos para subir"
+            quiet: true
+
+        - name: Include SharePoint upload role
+          ansible.builtin.include_role:
+            name: ansible_role_sharepoint_upload
+          vars:
+            sp_client_id: "{{ username }}"
+            sp_client_secret: "{{ key }}"
+
       rescue:
-        - name: Create placeholder file
+        - name: Create placeholder file for upload
           ansible.builtin.copy:
             content: "No files available for upload"
             dest: "{{ tower_src_path }}/placeholder.txt"
 
-    - name: Upload to sharepoint
-      ansible.builtin.include_role:
-        name: ansible_role_sharepoint_upload
-      vars:
-        sp_client_id: "{{ username }}"
-        sp_client_secret: "{{ key }}"
-      ignore_errors: yes
+        - name: Log upload issue
+          ansible.builtin.debug:
+            msg: "No se encontraron archivos para subir a SharePoint"
+
+      always:
+        - name: Final debug information
+          ansible.builtin.debug:
+            msg: "Proceso de subida a SharePoint completado"
