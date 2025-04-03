@@ -58,12 +58,12 @@
         name: OS-WIN-ansible-role.CheckList.ControlExistenciaFicheros
 
 - name: Process results and call CSV Dashboard role
-  hosts: localhost
-  connection: local
-  gather_facts: yes
+  hosts: localhost  # Ejecutar en localhost
+  connection: local  # Forzar conexión local
+  gather_facts: no   # No necesitamos facts para esta tarea
   vars:
     checklist_code: 'CHK-0044'
-    job_id: "{{ tower_job_id | default(628) }}"  # Usar tower_job_id si está definido
+    job_id: "{{ tower_job_id | default(630) }}"  # Usar tower_job_id si está definido
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Initialize all_host_results
@@ -76,13 +76,19 @@
       loop: "{{ groups['windows']|default([]) }}"
       when: hostvars[item] is defined and hostvars[item]['arr_results'] is defined
       
-    # Asegurar que el directorio existe (con local_action para ejecutar en control node)
+    # Asegurar que el directorio existe con shell local
     - name: Ensure directory for outputs exists
-      local_action:
-        module: file
-        path: "{{ tower_src_path }}"
-        state: directory
-        mode: '0755'
+      shell: 
+        cmd: "mkdir -p {{ tower_src_path }}"
+      args:
+        executable: /bin/bash
+
+    - name: Create placeholder file if no results
+      shell: 
+        cmd: "echo 'No results found for this execution' > {{ tower_src_path }}/no_results.txt"
+      args:
+        executable: /bin/bash
+      when: all_host_results | length == 0
         
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
       include_role:
@@ -97,20 +103,13 @@
         task_result: "{{ item[5] }}"
       loop: "{{ all_host_results }}"
       when: all_host_results | length > 0
-      
-    - name: Create placeholder file if no results
-      local_action:
-        module: copy
-        content: "No results found in this execution"
-        dest: "{{ tower_src_path }}/no_results.txt"
-      when: all_host_results | length == 0
 
 - name: Upload Files to Sharepoint
-  hosts: localhost
-  connection: local
-  gather_facts: no
+  hosts: localhost  # Ejecutar en localhost
+  connection: local  # Forzar conexión local
+  gather_facts: no   # No necesitamos facts para esta tarea
   vars:
-    job_id: "{{ tower_job_id | default(628) }}"
+    job_id: "{{ tower_job_id | default(630) }}"
     create_folder_in_sp: false
     create_custom_folder: false 
     custom_folder_name: "{{ gsma_code }}"
@@ -124,28 +123,28 @@
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
   tasks:
-    # Verificar que el directorio existe utilizando local_action
+    # Verificar que el directorio existe utilizando shell para mayor compatibilidad
     - name: Verify directory exists
-      local_action:
-        module: stat
-        path: "{{ tower_src_path }}"
-      register: dir_stat
+      shell: 
+        cmd: "[ -d {{ tower_src_path }} ] && echo 'exists' || echo 'not_exists'"
+      args:
+        executable: /bin/bash
+      register: dir_check
 
     # Si el directorio no existe, crear un archivo de muestra para evitar errores
-    - name: Create placeholder file if directory doesn't exist
-      local_action:
-        module: file
-        path: "{{ tower_src_path }}"
-        state: directory
-        mode: '0755'
-      when: not dir_stat.stat.exists
+    - name: Create directory if it doesn't exist
+      shell: 
+        cmd: "mkdir -p {{ tower_src_path }}"
+      args:
+        executable: /bin/bash
+      when: dir_check.stdout == 'not_exists'
           
     - name: Create placeholder file
-      local_action:
-        module: copy
-        content: "Placeholder file created by playbook"
-        dest: "{{ tower_src_path }}/placeholder.txt"
-      when: not dir_stat.stat.exists
+      shell: 
+        cmd: "echo 'Placeholder file created by playbook' > {{ tower_src_path }}/placeholder.txt"
+      args:
+        executable: /bin/bash
+      when: dir_check.stdout == 'not_exists'
 
     - name: Upload to sharepoint
       ansible.builtin.include_role:
@@ -160,16 +159,17 @@
     - name: Delete Output Files
       block:
         - name: Remove files using shell command
-          local_action:
-            module: shell
-            cmd: rm -rf "{{ tower_src_path }}"
+          shell: 
+            cmd: "rm -rf {{ tower_src_path }}"
+          args:
+            executable: /bin/bash
           when: 
              - sp_upload_result is defined 
              - sp_upload_result is not none 
              - sp_upload_result.failed | default(false) == false
       rescue:
         - name: Fallback removal method
-          local_action:
-            module: file
-            path: "{{ tower_src_path }}"
-            state: absent
+          shell: 
+            cmd: "rm -rf {{ tower_src_path }}"
+          args:
+            executable: /bin/bash
