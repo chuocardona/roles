@@ -1,8 +1,8 @@
 ---
-# OBJETIVO: Este playbook (OS-WIN-ansible-role.CheckList.Averias) está diseñado para realizar una serie de tareas relacionadas con:
+# OBJETIVO: Este playbook está diseñado para realizar una serie de tareas relacionadas con:
 #            - Verificación de archivos en hosts Windows.
 #            - Generación de un archivo CSV con resultados.
-#            - Carga de resultados a SharePoint.
+#            - Guardar resultados en AWX.
 
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
   hosts: SRVMDCPRO03
@@ -11,7 +11,7 @@
     ansible_connection: winrm
     ansible_winrm_server_cert_validation: ignore
     ansible_winrm_transport: ntlm
-    ansible_port: 5985  # HTTP
+    ansible_port: 5986  # HTTPS (cambiado a 5986 para conexión segura)
     ansible_user: ansible
     ansible_password: Zaq12wsx
   tasks:
@@ -27,22 +27,23 @@
   gather_facts: no
   vars:
     job_id: "{{ tower_job_id | default(649) }}"
-    tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
+    csv_dir: "/tmp/job"
   tasks:
     - name: Ensure output directory exists (Local task)
-      ansible.windows.win_shell: |
-        if (-not (Test-Path -Path "{{ tower_src_path }}")) {
-          New-Item -Path "{{ tower_src_path }}" -ItemType Directory -Force
-        }
+      ansible.builtin.file:
+        path: "{{ csv_dir }}"
+        state: directory
+        mode: '0755'
 
-- name: Process results and call CSV Dashboard role
+- name: Process results and generate CSV file
   hosts: localhost
   connection: local
   gather_facts: no
   vars:
     checklist_code: 'CHK-0044'
     job_id: "{{ tower_job_id | default(649) }}"
-    tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
+    csv_dir: "/tmp/job"
+    csv_file: "{{ csv_dir }}/control_existencia_ficheros_{{ job_id }}.csv"
   tasks:
     - name: Initialize all_host_results
       ansible.builtin.set_fact:
@@ -61,82 +62,25 @@
         - hostvars[item]['arr_results'] is defined
     
     - name: Create placeholder file if no results
-      ansible.windows.win_shell: |
-        Set-Content -Path "{{ tower_src_path }}/no_results.txt" -Value "No results found in this execution"
+      ansible.builtin.copy:
+        content: "No results found in this execution"
+        dest: "{{ csv_dir }}/no_results_{{ job_id }}.txt"
       when: all_host_results | length == 0
         
-    - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
-      include_role:
-        name: OS-LINUX-ansible-role.CSV.Dashboard
-      vars:
-        fase: "create"
-        checklist_code: "{{ item[0] }}"
-        task_name: "{{ item[1] }}"
-        task_code: "{{ item[2] }}"
-        task_description: "{{ item[3] }}"
-        task_result_description: "{{ item[4] }}"
-        task_result: "{{ item[5] }}"
+    - name: Generate CSV file with headers
+      ansible.builtin.copy:
+        content: "checklist_code,task_name,task_code,task_description,task_result_description,task_result\n"
+        dest: "{{ csv_file }}"
+      when: all_host_results | length > 0
+        
+    - name: Append results to CSV file
+      ansible.builtin.lineinfile:
+        path: "{{ csv_file }}"
+        line: "{{ item[0] }},{{ item[1] }},{{ item[2] }},{{ item[3] }},{{ item[4] }},{{ item[5] }}"
       loop: "{{ all_host_results }}"
       when: all_host_results | length > 0
 
-- name: Upload Files to Sharepoint
-  hosts: localhost
-  connection: local
-  gather_facts: no
-  vars:
-    job_id: "{{ tower_job_id | default(649) }}"
-    create_folder_in_sp: false
-    create_custom_folder: false 
-    custom_folder_name: "{{ gsma_code | default('SYN') }}"
-    upload_to_custom_folder: false
-    create_subfolder_in_sp: false
-    subfolder_name: "Checklist"
-    upload_to_subfolder: true
-    sharepoint_root_folder: 'at_role'
-    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
-    sp_teams_notification: false
-    tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
- 
-  tasks:
-    # Verificar que el directorio existe
-    - name: Verify directory existence
-      ansible.windows.win_shell: |
-        if (Test-Path -Path "{{ tower_src_path }}") {
-          Write-Output "exists"
-        } else {
-          Write-Output "not_exists"
-        }
-      register: dir_check
-
-    # Si el directorio no existe, crear un archivo de muestra para evitar errores
-    - name: Create directory if it doesn't exist
-      ansible.windows.win_shell: |
-        New-Item -Path "{{ tower_src_path }}" -ItemType Directory -Force
-      when: "'not_exists' in dir_check.stdout"
-          
-    - name: Create placeholder file
-      ansible.windows.win_shell: |
-        Set-Content -Path "{{ tower_src_path }}/placeholder.txt" -Value "Placeholder file created by playbook"
-      when: "'not_exists' in dir_check.stdout"
-
-    # Lista archivos manualmente usando PowerShell en lugar de módulo find
-    - name: List files in directory
-      ansible.windows.win_shell: |
-        Get-ChildItem -Path "{{ tower_src_path }}" -Recurse | Select-Object -ExpandProperty FullName
-      register: files_list
-      ignore_errors: true
-
-    - name: Display files found
+    - name: Display CSV file location
       ansible.builtin.debug:
-        var: files_list.stdout_lines
-        
-    # Vamos a omitir la carga a SharePoint ya que el módulo no es compatible
-    - name: Feedback about SharePoint upload
-      ansible.builtin.debug:
-        msg: "SharePoint upload functionality is not compatible with this environment. Files will remain in {{ tower_src_path }} directory."
-
-    # Opcionalmente, si deseas eliminar los archivos
-    - name: Delete Output Files
-      ansible.windows.win_shell: |
-        Remove-Item -Path "{{ tower_src_path }}" -Recurse -Force
-      when: false  # Desactivado por defecto para evitar pérdida de datos
+        msg: "CSV file has been generated at {{ csv_file }}"
+      when: all_host_results | length > 0
