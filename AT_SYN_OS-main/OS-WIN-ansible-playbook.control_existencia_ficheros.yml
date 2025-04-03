@@ -80,3 +80,13 @@
       ansible.builtin.debug:
         msg: "CSV file has been generated at {{ csv_file }}"
       when: all_host_results | length > 0
+
+    - name: Show CSV file content
+      ansible.builtin.shell: "cat /tmp/job/control_existencia_ficheros_{{ tower_job_id | default('718') }}.csv"
+      register: csv_content
+      delegate_to: localhost
+  
+    - name: Display CSV content
+      ansible.builtin.debug:
+      var: csv_content.stdout_lines
+      delegate_to: localhost
