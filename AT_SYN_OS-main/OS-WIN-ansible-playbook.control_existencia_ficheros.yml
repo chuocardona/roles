@@ -1,4 +1,4 @@
- ---
+---
 # OBJETIVO: Este playbook (OS-WIN-ansible-role.CheckList.Averias) está diseñado para realizar una serie de tareas relacionadas con:
 #            - Verificación de archivos en hosts Windows.
 #            - Generación de un archivo CSV con resultados.
