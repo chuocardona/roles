@@ -1,0 +1,30 @@
+---
+# defaults file for sharepoint upload ansible role
+sharepoint_root_folder: ''
+sharepoint_site_url: ''
+webhook_url: "NA"
+sp_teams_notification: true
+tower_src_path: ''
+
+create_folder_in_sp: true
+teams_notification_summary: "{% if not (download_from_sp) %}{{ 'SharePoint Upload' }}{% else %}{{ 'SharePoint Download' }}{% endif %}"
+teams_notification_title: "SharePoint Operations"
+
+download_folder_name: ''
+download_file_name: []
+download_from_sp: false # default functionality is upload
+
+check_folder_on_sp: false
+check_folder_name: ''
+
+custom_folder_name: ''
+create_custom_folder: false
+upload_to_custom_folder: false
+
+subfolder_name: ''
+create_subfolder_in_sp: false
+upload_to_subfolder: false
+
+delete_file_from_sp: false
+delete_folder_name: ''
+delete_file_name: []
