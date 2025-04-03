@@ -1,6 +1,6 @@
 ---
 - name: Verificar archivos en servidor Windows y subir reporte a SharePoint
-  hosts: "{{ win_server }}"
+  hosts: SRVMDCPRO03
   gather_facts: no
 
   vars:
