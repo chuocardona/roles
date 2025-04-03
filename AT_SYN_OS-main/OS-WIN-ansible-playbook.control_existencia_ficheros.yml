@@ -58,36 +58,52 @@
         name: OS-WIN-ansible-role.CheckList.ControlExistenciaFicheros
 
 - name: Process results and call CSV Dashboard role
-  hosts: localhost  # Ejecutar en localhost
-  connection: local  # Forzar conexión local
-  gather_facts: no   # No necesitamos facts para esta tarea
+  hosts: localhost
+  gather_facts: no
   vars:
     checklist_code: 'CHK-0044'
-    job_id: "{{ tower_job_id | default(630) }}"  # Usar tower_job_id si está definido
+    job_id: "{{ tower_job_id | default(632) }}"  # Usar ID de la ejecución actual
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
+    - name: Ensure local run
+      shell: 
+        cmd: "hostname"
+      register: hostname_check
+
+    - name: Fail if not running on control node
+      fail:
+        msg: "Este play debe ejecutarse en el nodo de control, no en un host Windows"
+      when: hostname_check.stdout == "SRVMDCPRO03"
+
     - name: Initialize all_host_results
       set_fact:
-        all_host_results: []        
+        all_host_results: []
+
+    - name: Check if windows group exists
+      shell: 
+        cmd: "grep -q 'windows' /etc/hosts || echo 'notfound'"
+      register: windows_group_check
+      ignore_errors: yes
      
+    # Solo intentar recopilar resultados si el grupo windows existe
     - name: Collect results from Windows hosts
       set_fact:
         all_host_results: "{{ all_host_results + hostvars[item]['arr_results']|default([]) }}"
       loop: "{{ groups['windows']|default([]) }}"
-      when: hostvars[item] is defined and hostvars[item]['arr_results'] is defined
+      when: 
+        - windows_group_check.stdout != "notfound"
+        - hostvars[item] is defined
+        - hostvars[item]['arr_results'] is defined
       
-    # Asegurar que el directorio existe con shell local
+    # Asegurar que el directorio existe
     - name: Ensure directory for outputs exists
       shell: 
         cmd: "mkdir -p {{ tower_src_path }}"
-      args:
-        executable: /bin/bash
 
+    # Crear archivo de referencia cuando no hay resultados
     - name: Create placeholder file if no results
       shell: 
-        cmd: "echo 'No results found for this execution' > {{ tower_src_path }}/no_results.txt"
-      args:
-        executable: /bin/bash
+        cmd: "echo 'No results found in this execution' > {{ tower_src_path }}/no_results.txt"
       when: all_host_results | length == 0
         
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
@@ -105,11 +121,10 @@
       when: all_host_results | length > 0
 
 - name: Upload Files to Sharepoint
-  hosts: localhost  # Ejecutar en localhost
-  connection: local  # Forzar conexión local
-  gather_facts: no   # No necesitamos facts para esta tarea
+  hosts: localhost
+  gather_facts: no
   vars:
-    job_id: "{{ tower_job_id | default(630) }}"
+    job_id: "{{ tower_job_id | default(632) }}"
     create_folder_in_sp: false
     create_custom_folder: false 
     custom_folder_name: "{{ gsma_code }}"
@@ -123,27 +138,31 @@
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
   tasks:
-    # Verificar que el directorio existe utilizando shell para mayor compatibilidad
+    - name: Ensure local run
+      shell: 
+        cmd: "hostname"
+      register: hostname_check
+
+    - name: Fail if not running on control node
+      fail:
+        msg: "Este play debe ejecutarse en el nodo de control, no en un host Windows"
+      when: hostname_check.stdout == "SRVMDCPRO03"
+
+    # Verificar que el directorio existe utilizando shell
     - name: Verify directory exists
       shell: 
         cmd: "[ -d {{ tower_src_path }} ] && echo 'exists' || echo 'not_exists'"
-      args:
-        executable: /bin/bash
       register: dir_check
 
     # Si el directorio no existe, crear un archivo de muestra para evitar errores
     - name: Create directory if it doesn't exist
       shell: 
         cmd: "mkdir -p {{ tower_src_path }}"
-      args:
-        executable: /bin/bash
       when: dir_check.stdout == 'not_exists'
           
     - name: Create placeholder file
       shell: 
         cmd: "echo 'Placeholder file created by playbook' > {{ tower_src_path }}/placeholder.txt"
-      args:
-        executable: /bin/bash
       when: dir_check.stdout == 'not_exists'
 
     - name: Upload to sharepoint
@@ -157,19 +176,9 @@
       ignore_errors: true
 
     - name: Delete Output Files
-      block:
-        - name: Remove files using shell command
-          shell: 
-            cmd: "rm -rf {{ tower_src_path }}"
-          args:
-            executable: /bin/bash
-          when: 
-             - sp_upload_result is defined 
-             - sp_upload_result is not none 
-             - sp_upload_result.failed | default(false) == false
-      rescue:
-        - name: Fallback removal method
-          shell: 
-            cmd: "rm -rf {{ tower_src_path }}"
-          args:
-            executable: /bin/bash
+      shell: 
+        cmd: "rm -rf {{ tower_src_path }}"
+      when: 
+         - sp_upload_result is defined 
+         - sp_upload_result is not none 
+         - sp_upload_result.failed | default(false) == false
