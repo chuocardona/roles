@@ -82,6 +82,7 @@
 
 - name: Upload Files to SharePoint
   hosts: localhost
+  connection: local
   gather_facts: no
   vars:
     job_id: "{{ tower_job_id | default(626) }}"
@@ -98,52 +99,54 @@
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
  
   tasks:
-    - name: Verify upload directory exists
-      ansible.builtin.stat:
-        path: "{{ tower_src_path }}"
-      register: upload_dir
-      ignore_errors: yes
-
-    - name: List files in directory
-      ansible.builtin.shell: 
-        cmd: "ls -l {{ tower_src_path }}"
-      register: file_list
-      when: upload_dir.stat is defined and upload_dir.stat.exists
-      changed_when: false
-      ignore_errors: yes
-
-    - name: Debug directory contents
-      ansible.builtin.debug:
-        var: file_list.stdout_lines
-      when: file_list is defined
-
-    - name: Upload to SharePoint
+    - name: Check SharePoint upload prerequisites
       block:
-        - name: Validate files for upload
-          ansible.builtin.assert:
-            that:
-              - file_list.stdout_lines | length > 0
-            fail_msg: "No hay archivos para subir"
-            quiet: true
+        - name: Verify upload directory
+          ansible.builtin.stat:
+            path: "{{ tower_src_path }}"
+          register: upload_dir
+          failed_when: not upload_dir.stat.exists
 
-        - name: Include SharePoint upload role
-          ansible.builtin.include_role:
-            name: ansible_role_sharepoint_upload
-          vars:
-            sp_client_id: "{{ username }}"
-            sp_client_secret: "{{ key }}"
+        - name: List files in directory
+          ansible.builtin.shell: 
+            cmd: "ls {{ tower_src_path }}"
+          register: file_list
+          changed_when: false
+          failed_when: file_list.stdout_lines | length == 0
+
+        - name: Debug directory contents
+          ansible.builtin.debug:
+            var: file_list.stdout_lines
+
+        - name: Upload to SharePoint
+          block:
+            - name: Include SharePoint upload role
+              ansible.builtin.include_role:
+                name: ansible_role_sharepoint_upload
+              vars:
+                sp_client_id: "{{ username }}"
+                sp_client_secret: "{{ key }}"
+          rescue:
+            - name: Log SharePoint upload failure
+              ansible.builtin.debug:
+                msg: "Error al subir archivos a SharePoint"
+
+            - name: Create placeholder for upload issue
+              ansible.builtin.copy:
+                content: "SharePoint upload failed"
+                dest: "{{ tower_src_path }}/upload_error.txt"
 
       rescue:
-        - name: Create placeholder file for upload
+        - name: Handle directory or file listing errors
+          ansible.builtin.debug:
+            msg: "No se encontraron archivos para subir o el directorio no existe"
+
+        - name: Create default placeholder
           ansible.builtin.copy:
             content: "No files available for upload"
             dest: "{{ tower_src_path }}/placeholder.txt"
 
-        - name: Log upload issue
-          ansible.builtin.debug:
-            msg: "No se encontraron archivos para subir a SharePoint"
-
       always:
-        - name: Final debug information
+        - name: Final upload status log
           ansible.builtin.debug:
             msg: "Proceso de subida a SharePoint completado"
