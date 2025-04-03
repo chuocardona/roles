@@ -88,5 +88,5 @@
   
     - name: Display CSV content
       ansible.builtin.debug:
-      var: csv_content.stdout_lines
+        var: csv_content.stdout_lines
       delegate_to: localhost
