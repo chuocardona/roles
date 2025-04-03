@@ -1,62 +1,78 @@
 ---
-- name: Verificar archivos en servidor Windows y subir reporte a SharePoint
+# Playbook para verificación de archivos en Windows y carga a SharePoint
+- name: Verificar archivos en Windows
   hosts: SRVMDCPRO03
   gather_facts: no
-
   vars:
-    ansible_user: "{{ win_user }}"
-    ansible_password: "{{ win_pass }}"
     ansible_connection: winrm
+    ansible_port: 5986
+    ansible_winrm_transport: credssp
     ansible_winrm_server_cert_validation: ignore
-    win_path: \srvdfs01\APLICACIONES\BIG_DATA_MDMB_PRO\MDMAB\Lectures\
-    checklist_code: CHK-0044
-    sharepoint_site_url: https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam
-    sp_client_id: 67b44fac-c6b7-42b3-b2c9-2c1a56266f5f
-    sp_client_secret: ouV8Q~9xUZjQyOUFsSA3c6ngtrz.ZnIi1P03ubWW
-    temp_dir: ./temp_report
-
+    target_path: \\srvdfs01\APLICACIONES\BIG_DATA_MDMB_PRO\MDMAB\Lectures\
+    csv_name: "resultados_checklist_{{ job_id }}.csv"
+    
   tasks:
+    - name: Buscar archivos en ruta especificada
+      ansible.windows.win_find:
+        paths: "{{ target_path }}"
+        age: 0
+      register: files_result
 
-    - name: Crear directorio temporal para reporte
-      file:
-        path: "{{ temp_dir }}"
+    - name: Generar estructura de resultados
+      set_fact:
+        checklist_results: |
+          [
+            {% for file in files_result.files %}
+            ["CHK-0044", "Verificación de archivo {{ file.filename }}", "TC-{{ '%03d' % loop.index }}", 
+            "Verificar existencia de {{ file.filename }} en {{ target_path }}", 
+            "Archivo encontrado", "OK"]{% if not loop.last %},{% endif %}
+            {% endfor %}
+          ]
+      when: files_result.files | length > 0
+
+- name: Generar y cargar CSV
+  hosts: localhost
+  gather_facts: false
+  vars:
+    sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
+    temp_path: "/tmp/ansible_checklist/{{ job_id }}/"
+    
+  tasks:
+    - name: Crear directorio temporal
+      ansible.builtin.file:
+        path: "{{ temp_path }}"
         state: directory
+
+    - name: Generar archivo CSV
+      ansible.builtin.copy:
+        dest: "{{ temp_path }}checklist_results.csv"
+        content: |
+          Checklist Code,Tarea,Task Code,Descripción,Resultado,Estado
+          {% for item in hostvars.SRVMDCPRO03.checklist_results | from_json %}
+          {{ item|join(',') }}
+          {% endfor %}
       delegate_to: localhost
 
-    - name: Obtener lista de archivos en servidor Windows
-      win_find:
-        path: "{{ win_path }}"
-        file_type: file
-      register: win_files
+    - name: Subir a SharePoint
+      block:
+        - name: Cargar archivo a SharePoint
+          community.general.sharepoint:
+            client_id: "{{ sp_client_id }}"
+            client_secret: "{{ sp_client_secret }}"
+            site_url: "{{ sharepoint_site_url }}"
+            folder_path: "Documentos/Checklists/"
+            file_path: "{{ temp_path }}checklist_results.csv"
+            overwrite: yes
+          register: upload_result
 
-    - name: Generar reporte CSV
-      ansible.builtin.template:
-        src: report_template.csv.j2
-        dest: "{{ temp_dir }}/{{ checklist_code }}_report.csv"
-      vars:
-        files: "{{ win_files.files }}"
-      delegate_to: localhost
-      
-    - name: Leer contenido del reporte CSV
-      slurp:
-        src: "{{ temp_dir }}/{{ checklist_code }}_report.csv"
-      register: report_content
-      delegate_to: localhost
+      rescue:
+        - name: Manejar error en carga
+          ansible.builtin.debug:
+            msg: "Error subiendo archivo a SharePoint. Código de error: {{ upload_result.status }}"
 
-    - name: Subir reporte a SharePoint
-      uri:
-        url: "{{ sharepoint_site_url }}/_api/web/getfolderbyserverrelativeurl('Reportes/{{ checklist_code }}')/files/add(overwrite=true, url='{{ checklist_code }}_report.csv')"
-        method: POST
-        body: "{{ report_content['content'] | b64decode }}"
-        body_format: raw
-        headers:
-          Authorization: "Bearer {{ sharepoint_access_token }}"
-          Accept: "application/json;odata=verbose"
-          Content-Type: "text/csv"
-      delegate_to: localhost
-
-    - name: Eliminar directorio temporal
-      file:
-        path: "{{ temp_dir }}"
-        state: absent
-      delegate_to: localhost
+      always:
+        - name: Limpiar archivos temporales
+          ansible.builtin.file:
+            path: "{{ temp_path }}"
+            state: absent
+          ignore_errors: yes
