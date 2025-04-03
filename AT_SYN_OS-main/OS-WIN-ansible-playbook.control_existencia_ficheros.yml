@@ -29,11 +29,23 @@
     job_id: "{{ tower_job_id | default(683) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
-    - name: Ensure output directory exists (Local task)
-      ansible.windows.win_shell: |
-        if (-not (Test-Path -Path "{{ tower_src_path }}")) {
-          New-Item -Path "{{ tower_src_path }}" -ItemType Directory -Force
-        }
+    - name: Ensure base output directory exists
+      ansible.builtin.file:
+        path: "/tmp/dashboard_out"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure job-specific output directory exists
+      ansible.builtin.file:
+        path: "{{ tower_src_path }}"
+        state: directory
+        mode: '0755'
+
+    - name: Debug directories
+      ansible.builtin.debug:
+        msg: 
+          - "Base directory: /tmp/dashboard_out"
+          - "Job-specific directory: {{ tower_src_path }}"
 
 - name: Process results and call CSV Dashboard role
   hosts: localhost
@@ -61,8 +73,9 @@
         - hostvars[item]['arr_results'] is defined
     
     - name: Create placeholder file if no results
-      ansible.windows.win_shell: |
-        Set-Content -Path "{{ tower_src_path }}/no_results.txt" -Value "No results found in this execution"
+      ansible.builtin.copy:
+        content: "No results found in this execution"
+        dest: "{{ tower_src_path }}/no_results.txt"
       when: all_host_results | length == 0
         
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
@@ -89,13 +102,38 @@
     sharepoint_site_url: 'https://kyndryl.sharepoint.com/teams/EnterpriseClientUnit-Ind.GenericTeam'
 
   tasks:
-    - name: Check if files exist in SharePoint upload directory
-      ansible.builtin.stat:
-        path: "{{ tower_src_path }}"
-      register: sp_upload_directory
+    - name: Validate upload directory
+      block:
+        - name: Check if files exist in SharePoint upload directory
+          ansible.builtin.stat:
+            path: "{{ tower_src_path }}"
+          register: sp_upload_directory
+          ignore_errors: yes
+
+        - name: Debug upload directory information
+          ansible.builtin.debug:
+            var: sp_upload_directory
+
+        - name: List directory contents
+          ansible.builtin.shell: 
+            cmd: "ls -la {{ tower_src_path }}"
+          register: directory_contents
+          ignore_errors: yes
+
+        - name: Show directory contents
+          ansible.builtin.debug:
+            var: directory_contents
 
     - name: Upload to SharePoint
       block:
+        - name: Validate upload prerequisites
+          ansible.builtin.assert:
+            that:
+              - sp_upload_directory.stat is defined
+              - sp_upload_directory.stat.exists
+              - sp_upload_directory.stat.isdir
+            fail_msg: "SharePoint upload prerequisites not met"
+
         - name: Include SharePoint upload role
           ansible.builtin.include_role:
             name: ansible_role_sharepoint_upload
@@ -107,13 +145,18 @@
             local_file_path: "{{ tower_src_path }}"
           register: sp_upload_result
           when: 
-            - sp_upload_directory.stat.exists
-            - sp_upload_directory.stat.isdir
+            - sp_upload_directory.stat.exists | default(false)
+            - sp_upload_directory.stat.isdir | default(false)
 
       rescue:
         - name: Log SharePoint upload failure
           ansible.builtin.debug:
-            msg: "SharePoint upload failed: {{ ansible_failed_result }}"
+            msg: 
+              - "SharePoint upload failed"
+              - "Error details: {{ ansible_failed_result }}"
+              - "Upload directory: {{ tower_src_path }}"
+              - "Directory exists: {{ sp_upload_directory.stat.exists | default('Unknown') }}"
+              - "Is directory: {{ sp_upload_directory.stat.isdir | default('Unknown') }}"
 
     - name: Cleanup uploaded files
       block:
