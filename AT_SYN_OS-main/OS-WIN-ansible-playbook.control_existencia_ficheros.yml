@@ -2,7 +2,7 @@
 # OBJETIVO: Este playbook está diseñado para realizar una serie de tareas relacionadas con:
 #            - Verificación de archivos en hosts Windows.
 #            - Generación de un archivo CSV con resultados.
-#            - Guardar resultados en AWX.
+#            - Guardar resultados en una ubicación persistente del servidor.
 
 - name: PLAYBOOK CONTROL EXISTENCIA FICHEROS
   hosts: SRVMDCPRO03
@@ -25,10 +25,11 @@
   hosts: localhost
   connection: local
   gather_facts: no
-  become: no  # Importante: desactivamos "become" para evitar problemas de permisos
+  become: yes  # Activamos become para poder crear directorios en ubicaciones del sistema
   vars:
     job_id: "{{ tower_job_id | default(649) }}"
-    csv_dir: "/tmp/job"
+    # Ruta persistente para guardar los CSV
+    csv_dir: "/var/lib/awx/csv_reports"
     csv_file: "{{ csv_dir }}/control_existencia_ficheros_{{ job_id }}.csv"
   tasks:
     - name: Ensure output directory exists
@@ -36,6 +37,9 @@
         path: "{{ csv_dir }}"
         state: directory
         mode: '0755'
+        # Ajusta el propietario según lo que sea apropiado para tu sistema
+        owner: root
+        group: root
       register: dir_result
       ignore_errors: yes
       
@@ -82,11 +86,29 @@
       when: all_host_results | length > 0
 
     - name: Show CSV file content
-      ansible.builtin.shell: "cat /tmp/job/control_existencia_ficheros_{{ tower_job_id | default('718') }}.csv"
+      ansible.builtin.shell: "cat {{ csv_file }}"
       register: csv_content
       delegate_to: localhost
+      when: all_host_results | length > 0
   
     - name: Display CSV content
       ansible.builtin.debug:
         var: csv_content.stdout_lines
       delegate_to: localhost
+      when: all_host_results | length > 0
+
+    # Establecer permisos adecuados para que el archivo sea accesible
+    - name: Ensure proper permissions on CSV file
+      ansible.builtin.file:
+        path: "{{ csv_file }}"
+        mode: '0644'
+        # Ajusta si es necesario para que sea accesible por los usuarios que necesitan leerlo
+        owner: root
+        group: root
+      when: all_host_results | length > 0
+      ignore_errors: yes
+
+    - name: Show path to access the file
+      ansible.builtin.debug:
+        msg: "Para acceder al archivo en el servidor, usa: cat {{ csv_file }}"
+      when: all_host_results | length > 0
