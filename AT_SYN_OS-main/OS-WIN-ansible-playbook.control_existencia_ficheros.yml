@@ -141,10 +141,6 @@
         Remove-Item -Path "{{ tower_src_path }}" -Recurse -Force
       when: false  # Desactivado por defecto para evitar pérdida de datos
 
-      ---
-# [Contenido del playbook original]
-# ... [playbooks anteriores]
-
 - name: Upload Files to Sharepoint
   hosts: "{{ delegate_launch_node_linux if delegate_launch_node_linux | default('') else 'localhost' }}"
   gather_facts: true
