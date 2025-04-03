@@ -1,4 +1,4 @@
----
+ ---
 # OBJETIVO: Este playbook (OS-WIN-ansible-role.CheckList.Averias) está diseñado para realizar una serie de tareas relacionadas con:
 #            - Verificación de archivos en hosts Windows.
 #            - Generación de un archivo CSV con resultados.
@@ -23,19 +23,25 @@
 
 - name: Prepare CSV output directory
   hosts: localhost
+  connection: local
   gather_facts: no
-  connection: ssh
+  vars:
+    job_id: "{{ tower_job_id | default(645) }}"
+    tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
-    - name: Ensure output directory exists (Linux task)
-      ansible.builtin.raw: mkdir -p /tmp/dashboard_out/{{ tower_job_id | default(643) }}
+    - name: Ensure output directory exists (Local task)
+      ansible.windows.win_shell: |
+        if (-not (Test-Path -Path "{{ tower_src_path }}")) {
+          New-Item -Path "{{ tower_src_path }}" -ItemType Directory -Force
+        }
 
 - name: Process results and call CSV Dashboard role
   hosts: localhost
+  connection: local
   gather_facts: no
-  connection: ssh
   vars:
     checklist_code: 'CHK-0044'
-    job_id: "{{ tower_job_id | default(643) }}"
+    job_id: "{{ tower_job_id | default(645) }}"
     tower_src_path: "/tmp/dashboard_out/{{ job_id }}"
   tasks:
     - name: Initialize all_host_results
@@ -55,7 +61,8 @@
         - hostvars[item]['arr_results'] is defined
     
     - name: Create placeholder file if no results
-      ansible.builtin.raw: echo 'No results found in this execution' > {{ tower_src_path }}/no_results.txt
+      ansible.windows.win_shell: |
+        Set-Content -Path "{{ tower_src_path }}/no_results.txt" -Value "No results found in this execution"
       when: all_host_results | length == 0
         
     - name: Call OS-LINUX-ansible-role.CSV.Dashboard for each result
@@ -74,10 +81,10 @@
 
 - name: Upload Files to Sharepoint
   hosts: localhost
+  connection: local
   gather_facts: no
-  connection: ssh
   vars:
-    job_id: "{{ tower_job_id | default(643) }}"
+    job_id: "{{ tower_job_id | default(645) }}"
     create_folder_in_sp: false
     create_custom_folder: false 
     custom_folder_name: "{{ gsma_code | default('SYN') }}"
@@ -93,16 +100,23 @@
   tasks:
     # Verificar que el directorio existe
     - name: Verify directory existence
-      ansible.builtin.raw: if [ -d {{ tower_src_path }} ]; then echo "exists"; else echo "not_exists"; fi
+      ansible.windows.win_shell: |
+        if (Test-Path -Path "{{ tower_src_path }}") {
+          Write-Output "exists"
+        } else {
+          Write-Output "not_exists"
+        }
       register: dir_check
 
     # Si el directorio no existe, crear un archivo de muestra para evitar errores
     - name: Create directory if it doesn't exist
-      ansible.builtin.raw: mkdir -p {{ tower_src_path }}
+      ansible.windows.win_shell: |
+        New-Item -Path "{{ tower_src_path }}" -ItemType Directory -Force
       when: "'not_exists' in dir_check.stdout"
           
     - name: Create placeholder file
-      ansible.builtin.raw: echo 'Placeholder file created by playbook' > {{ tower_src_path }}/placeholder.txt
+      ansible.windows.win_shell: |
+        Set-Content -Path "{{ tower_src_path }}/placeholder.txt" -Value "Placeholder file created by playbook"
       when: "'not_exists' in dir_check.stdout"
 
     - name: Upload to sharepoint
@@ -116,7 +130,8 @@
       ignore_errors: true
 
     - name: Delete Output Files
-      ansible.builtin.raw: rm -rf {{ tower_src_path }}
+      ansible.windows.win_shell: |
+        Remove-Item -Path "{{ tower_src_path }}" -Recurse -Force
       when: 
          - sp_upload_result is defined 
          - sp_upload_result is not none 
